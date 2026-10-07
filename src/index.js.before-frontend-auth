@@ -7,14 +7,9 @@ import { requireImageAuth } from "./auth/imageAuth.js";
 
 
 import { adminRoute } from "./routes/admin.js";
-import { adminArticlesRoute } from "./routes/adminArticles.js";
-import { isAdminApiPath } from "./routes/adminApiPaths.js";
 
 import { authRoute } from "./routes/auth.js";
-import { frontendAuthRoute } from "./routes/frontendAuth.js";
-import { frontendAdminRoute } from "./routes/frontendAdmin.js";
 
-import { articlesRoute } from "./routes/articles.js";
 import { galleryRoute } from "./routes/gallery.js";
 import { imageRoute } from "./routes/image.js";
 import { thumbRoute } from "./routes/thumb.js";
@@ -38,7 +33,19 @@ function jsonError(message, status = 404) {
 }
 
 
+function isAdminApiPath(pathname) {
 
+  return (
+    pathname === "/admin/stats" ||
+    pathname === "/admin/storage" ||
+    pathname === "/admin/albums" ||
+    pathname === "/admin/images" ||
+    pathname === "/admin/images/search" ||
+    pathname.startsWith("/admin/images/") ||
+    pathname === "/admin/duplicates"
+  );
+
+}
 
 
 // =========================================================
@@ -124,201 +131,9 @@ export default {
       }
 
 
-
-
-
-            if (
-        request.method === "GET" &&
-        pathname === "/test/articles"
-      ) {
-
-        try {
-
-          const {
-            listDriveFiles
-          } = await import(
-            "./drive/google.js"
-          );
-
-          if (!env.DRIVE_ARTICLES_DATABASE_ID) {
-            return Response.json({
-              success: false,
-              error:
-                "DRIVE_ARTICLES_DATABASE_ID is missing"
-            }, {
-              status: 500
-            });
-          }
-
-          const result =
-            await listDriveFiles(
-              env,
-              [
-                `'${env.DRIVE_ARTICLES_DATABASE_ID}' in parents`,
-                "trashed=false"
-              ].join(" and "),
-              "files(id,name,mimeType,size,modifiedTime,createdTime,parents)"
-            );
-
-          return Response.json({
-            success: true,
-            folderId:
-              env.DRIVE_ARTICLES_DATABASE_ID,
-            total:
-              result.files?.length || 0,
-            files:
-              result.files || []
-          });
-
-        } catch (error) {
-
-          console.error(
-            "Article Drive folder test failed:",
-            error
-          );
-
-          return Response.json({
-            success: false,
-            error: error.message
-          }, {
-            status: 500
-          });
-
-        }
-
-      }
-
-
-
-
-
-if (
-  request.method === "GET" &&
-  pathname === "/test/articles-provider"
-) {
-
-  try {
-
-    const {
-      listArticles
-    } = await import(
-      "./articles/articleDrive.js"
-    );
-
-    const result =
-      await listArticles(env);
-
-    return Response.json({
-      success: true,
-      total: result.total,
-      articles: result.rows
-    });
-
-  } catch (error) {
-
-    console.error(
-      "Article provider test failed:",
-      error
-    );
-
-    return Response.json({
-      success: false,
-      error: error.message
-    }, {
-      status: 500
-    });
-
-  }
-
-}
-
-
-
-
-if (
-  request.method === "GET" &&
-  pathname === "/test/articles-root"
-) {
-
-  try {
-
-    const {
-      listDriveFiles
-    } = await import("./drive/google.js");
-
-    if (!env.DRIVE_ARTICLES_ROOT_ID) {
-      return Response.json({
-        success: false,
-        error: "DRIVE_ARTICLES_ROOT_ID is missing"
-      }, {
-        status: 500
-      });
-    }
-
-    const result =
-      await listDriveFiles(
-        env,
-        [
-          `'${env.DRIVE_ARTICLES_ROOT_ID}' in parents`,
-          "trashed=false"
-        ].join(" and "),
-        "files(id,name,mimeType,size,modifiedTime,createdTime,parents)"
-      );
-
-    return Response.json({
-      success: true,
-      folderId: env.DRIVE_ARTICLES_ROOT_ID,
-      total: result.files?.length || 0,
-      files: result.files || []
-    });
-
-  } catch (error) {
-
-    console.error(
-      "Article root Drive test failed:",
-      error
-    );
-
-    return Response.json({
-      success: false,
-      error: error.message
-    }, {
-      status: 500
-    });
-
-  }
-
-}
-
-
-
-
-
-
-
-
 // =======================================================
 // AUTH
 // =======================================================
-
-// -------------------------------------------------------
-// FRONTEND AUTH
-// Must come before the general /auth/ route.
-// -------------------------------------------------------
-
-if (
-    pathname.startsWith("/auth/frontend/")
-) {
-    return frontendAuthRoute(
-        request,
-        env
-    );
-}
-
-
-// -------------------------------------------------------
-// ADMIN AUTH
-// -------------------------------------------------------
 
 if (
     pathname.startsWith("/auth/")
@@ -328,43 +143,6 @@ if (
         env
     );
 }
-
-
-
-
-// =======================================================
-// PUBLIC ARTICLES
-// =======================================================
-//
-// Public article API:
-//
-// GET  /articles
-// GET  /articles/popular
-// GET  /articles/:slug
-// GET  /articles/:slug/status
-// GET  /articles/:slug/content
-// GET  /articles/:slug/raw
-//
-// POST /articles/login
-// POST /articles/logout
-//
-// IMPORTANT:
-// This route is PUBLIC.
-// It must NOT use requireAdmin().
-//
-// =======================================================
-
-if (
-  pathname === "/articles" ||
-  pathname === "/articles/" ||
-  pathname.startsWith("/articles/")
-) {
-  return articlesRoute(
-    request,
-    env
-  );
-}
-
 
 
       // =======================================================
@@ -492,35 +270,6 @@ if (
       }
 
 
-
-
-// =======================================================
-// FRONTEND ADMIN
-// =======================================================
-
-if (
-    pathname === "/admin/frontend/accounts" ||
-    /^\/admin\/frontend\/(gallery|articles)\/password$/.test(pathname)
-) {
-
-    const authResponse =
-        await requireAdmin(
-            request,
-            env
-        );
-
-    if (!authResponse.authenticated) {
-        return authResponse.response;
-    }
-
-    return frontendAdminRoute(
-        request,
-        env
-    );
-}
-
-
-
       // =======================================================
       // ADMIN API
       // =======================================================
@@ -538,40 +287,6 @@ if (
       // from being mistaken for API requests.
       //
       // =======================================================
-
-      // =======================================================
-      // ADMIN ARTICLES API
-      // =======================================================
-      //
-      // Article management has its own route module.
-      //
-      // /admin/articles
-      // /admin/articles/*
-      //
-      // =======================================================
-
-      if (
-        pathname === "/admin/articles" ||
-        pathname.startsWith("/admin/articles/")
-      ) {
-
-        const authResponse =
-          await requireAdmin(
-            request,
-            env
-          );
-
-        if (!authResponse.authenticated) {
-          return authResponse.response;
-        }
-
-        return adminArticlesRoute(
-          request,
-          env,
-          ctx
-        );
-      }
-
 
       if (
         isAdminApiPath(pathname)

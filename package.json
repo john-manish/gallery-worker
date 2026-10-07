@@ -11,11 +11,16 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.0.0",
+    "@cloudflare/workerd-linux-arm64": "^1.20261006.1",
     "vitest": "~4.1.0",
     "wrangler": "^4"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
     "workerd@1.20260923.1": true
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "markdown-it": "^15.0.2"
   }
 }

@@ -1,20 +1,8 @@
-// =========================================================
-// GOOGLE DRIVE API
-// =========================================================
-
 const TOKEN_URL =
   "https://oauth2.googleapis.com/token";
 
 const DRIVE_API =
   "https://www.googleapis.com/drive/v3";
-
-const DRIVE_UPLOAD_API =
-  "https://www.googleapis.com/upload/drive/v3";
-
-
-// =========================================================
-// TOKEN CACHE
-// =========================================================
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
@@ -22,6 +10,10 @@ let tokenExpiresAt = 0;
 
 // =========================================================
 // GOOGLE OAUTH2
+// Same authentication model as the old backend:
+// GOOGLE_CLIENT_ID
+// GOOGLE_CLIENT_SECRET
+// GOOGLE_REFRESH_TOKEN
 // =========================================================
 
 async function getAccessToken(env) {
@@ -35,28 +27,35 @@ async function getAccessToken(env) {
 
 
   if (!env.GOOGLE_CLIENT_ID) {
+
     throw new Error(
       "GOOGLE_CLIENT_ID is missing"
     );
+
   }
 
 
   if (!env.GOOGLE_CLIENT_SECRET) {
+
     throw new Error(
       "GOOGLE_CLIENT_SECRET is missing"
     );
+
   }
 
 
   if (!env.GOOGLE_REFRESH_TOKEN) {
+
     throw new Error(
       "GOOGLE_REFRESH_TOKEN is missing"
     );
+
   }
 
 
   const body =
     new URLSearchParams({
+
       client_id:
         env.GOOGLE_CLIENT_ID,
 
@@ -68,6 +67,7 @@ async function getAccessToken(env) {
 
       grant_type:
         "refresh_token"
+
     });
 
 
@@ -78,7 +78,7 @@ async function getAccessToken(env) {
         method: "POST",
 
         headers: {
-          "Content-Type":
+          "content-type":
             "application/x-www-form-urlencoded"
         },
 
@@ -95,6 +95,7 @@ async function getAccessToken(env) {
     throw new Error(
       `Google OAuth token request failed: ${response.status} ${error}`
     );
+
   }
 
 
@@ -103,9 +104,11 @@ async function getAccessToken(env) {
 
 
   if (!data.access_token) {
+
     throw new Error(
       "Google OAuth token response did not contain access_token"
     );
+
   }
 
 
@@ -121,56 +124,12 @@ async function getAccessToken(env) {
 
 
   return cachedToken;
-}
 
-
-// =========================================================
-// DRIVE URL RESOLUTION
-//
-// api:
-//   "drive"   -> /drive/v3
-//   "upload"  -> /upload/drive/v3
-//
-// Keeping this explicit prevents accidental use of the
-// metadata endpoint for upload requests.
-// =========================================================
-
-function getDriveBaseUrl(api = "drive") {
-
-  if (api === "upload") {
-    return DRIVE_UPLOAD_API;
-  }
-
-
-  if (api === "drive") {
-    return DRIVE_API;
-  }
-
-
-  throw new Error(
-    `Unknown Google Drive API type: ${api}`
-  );
 }
 
 
 // =========================================================
 // DRIVE FETCH
-//
-// Normal request:
-//
-//   driveFetch(env, "/files")
-//
-// Upload request:
-//
-//   driveFetch(
-//     env,
-//     "/files?uploadType=multipart",
-//     {
-//       api: "upload"
-//     }
-//   )
-//
-// "api" is removed before passing options to fetch().
 // =========================================================
 
 export async function driveFetch(
@@ -183,42 +142,31 @@ export async function driveFetch(
     await getAccessToken(env);
 
 
-  const {
-    api = "drive",
-    ...fetchOptions
-  } = options;
-
-
-  const baseUrl =
-    getDriveBaseUrl(api);
-
-
   const headers =
     new Headers(
-      fetchOptions.headers || {}
+      options.headers || {}
     );
 
 
   headers.set(
-    "Authorization",
+    "authorization",
     `Bearer ${token}`
   );
 
 
   return fetch(
-    `${baseUrl}${path}`,
+    `${DRIVE_API}${path}`,
     {
-      ...fetchOptions,
+      ...options,
       headers
     }
   );
+
 }
 
 
 // =========================================================
 // CHECKED DRIVE FETCH
-//
-// Centralized error handling for all Drive requests.
 // =========================================================
 
 async function checkedDriveFetch(
@@ -244,10 +192,12 @@ async function checkedDriveFetch(
     throw new Error(
       `Google Drive API failed: ${response.status} ${error}`
     );
+
   }
 
 
   return response;
+
 }
 
 
@@ -268,13 +218,16 @@ export async function getDriveFile(
 
 
   return response.json();
+
 }
 
 
 // =========================================================
 // LIST FILES
 //
-// Supports pagination for large Drive folders.
+// Optional pagination parameters were added so the article
+// provider can reproduce the old backend's nextPageToken
+// behavior without breaking existing callers.
 // =========================================================
 
 export async function listDriveFiles(
@@ -306,6 +259,7 @@ export async function listDriveFiles(
       "pageToken",
       pageToken
     );
+
   }
 
 
@@ -317,14 +271,12 @@ export async function listDriveFiles(
 
 
   return response.json();
+
 }
 
 
 // =========================================================
 // DOWNLOAD FILE
-//
-// Uses the normal Drive API because this is a metadata/media
-// retrieval operation, not an upload.
 // =========================================================
 
 export async function downloadDriveFile(
@@ -336,6 +288,7 @@ export async function downloadDriveFile(
     env,
     `/files/${encodeURIComponent(fileId)}?alt=media`
   );
+
 }
 
 
@@ -358,7 +311,7 @@ export async function updateDriveFile(
         method: "PATCH",
 
         headers: {
-          "Content-Type":
+          "content-type":
             mimeType
         },
 
@@ -368,22 +321,12 @@ export async function updateDriveFile(
 
 
   return response.json();
+
 }
 
 
 // =========================================================
 // CREATE FILE
-//
-// Google Drive multipart upload:
-//
-//   POST
-//   https://www.googleapis.com/upload/drive/v3/files
-//
-// Part 1:
-//   JSON metadata
-//
-// Part 2:
-//   file content
 // =========================================================
 
 export async function createDriveFile(
@@ -394,126 +337,89 @@ export async function createDriveFile(
   mimeType = "application/json"
 ) {
 
-  if (!name) {
-    throw new Error(
-      "Drive file name is required."
-    );
-  }
-
-
-  if (!parentId) {
-    throw new Error(
-      "Drive parent folder ID is required."
-    );
-  }
-
-
   const metadata = {
+
     name,
+
     parents: [
       parentId
-    ]
+    ],
+
+    mimeType
+
   };
 
 
   const boundary =
-    `GalleryWorker_${crypto.randomUUID()}`;
+    `----GalleryWorker${crypto.randomUUID()}`;
 
 
   const encoder =
     new TextEncoder();
 
 
-  const metadataBytes =
-    encoder.encode(
-      JSON.stringify(metadata)
+  const metadataPart =
+    JSON.stringify(
+      metadata
     );
 
 
   const bodyBytes =
     typeof body === "string"
       ? encoder.encode(body)
-      : body instanceof Uint8Array
-        ? body
-        : new Uint8Array(body);
+      : body;
 
 
-  const metadataPart =
+  const prefix =
     encoder.encode(
+
       `--${boundary}\r\n` +
-      `Content-Type: application/json; charset=UTF-8\r\n\r\n`
-    );
 
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
 
-  const mediaPart =
-    encoder.encode(
-      `\r\n--${boundary}\r\n` +
+      `${metadataPart}\r\n` +
+
+      `--${boundary}\r\n` +
+
       `Content-Type: ${mimeType}\r\n\r\n`
+
     );
 
 
-  const closingPart =
+  const suffix =
     encoder.encode(
       `\r\n--${boundary}--\r\n`
     );
 
 
-  const totalLength =
-    metadataPart.byteLength +
-    metadataBytes.byteLength +
-    mediaPart.byteLength +
-    bodyBytes.byteLength +
-    closingPart.byteLength;
-
-
   const combined =
     new Uint8Array(
-      totalLength
+
+      prefix.byteLength +
+
+      bodyBytes.byteLength +
+
+      suffix.byteLength
+
     );
 
 
-  let offset = 0;
-
-
   combined.set(
-    metadataPart,
-    offset
+    prefix,
+    0
   );
-
-  offset +=
-    metadataPart.byteLength;
-
-
-  combined.set(
-    metadataBytes,
-    offset
-  );
-
-  offset +=
-    metadataBytes.byteLength;
-
-
-  combined.set(
-    mediaPart,
-    offset
-  );
-
-  offset +=
-    mediaPart.byteLength;
 
 
   combined.set(
     bodyBytes,
-    offset
+    prefix.byteLength
   );
-
-  offset +=
-    bodyBytes.byteLength;
 
 
   combined.set(
-    closingPart,
-    offset
+    suffix,
+    prefix.byteLength +
+      bodyBytes.byteLength
   );
 
 
@@ -522,32 +428,29 @@ export async function createDriveFile(
       env,
       "/files?uploadType=multipart&fields=id,name,mimeType,createdTime,modifiedTime",
       {
-        api: "upload",
-
         method: "POST",
 
         headers: {
-          "Content-Type":
+
+          "content-type":
             `multipart/related; boundary=${boundary}`
+
         },
 
         body:
           combined
+
       }
     );
 
 
   return response.json();
+
 }
 
 
 // =========================================================
 // UPDATE FILE MEDIA
-//
-// Uses Google's upload endpoint.
-//
-// This is separate from updateDriveFile(), which updates
-// metadata through the normal Drive API.
 // =========================================================
 
 export async function updateDriveFileMedia(
@@ -557,31 +460,26 @@ export async function updateDriveFileMedia(
   mimeType = "application/json"
 ) {
 
-  if (!fileId) {
-    throw new Error(
-      "Drive file ID is required."
-    );
-  }
-
-
   const response =
     await checkedDriveFetch(
       env,
       `/files/${encodeURIComponent(fileId)}?uploadType=media`,
       {
-        api: "upload",
-
         method: "PATCH",
 
         headers: {
-          "Content-Type":
+
+          "content-type":
             mimeType
+
         },
 
         body
+
       }
     );
 
 
   return response.json();
+
 }

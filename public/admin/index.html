@@ -1,0 +1,3785 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+        <link href="manifest.webmanifest" rel="manifest" />
+        <meta content="#0b1220" name="theme-color" />
+        <meta content="yes" name="mobile-web-app-capable" />
+        <meta content="yes" name="apple-mobile-web-app-capable" />
+        <meta
+            content="black-translucent"
+            name="apple-mobile-web-app-status-bar-style"
+        />
+        <title>Gallery OS V2.0</title>
+        <link href="admin.css" rel="stylesheet" />
+        <link href="../article-page.css" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com" rel="preconnect" />
+        <link
+            crossorigin=""
+            href="https://fonts.gstatic.com"
+            rel="preconnect"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <!-- ============================================================
+   GLOBAL NAVIGATION
+   Sidebar and mobile navigation overlay
+============================================================ -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">G</div>
+                <div>
+                    <h2 id="brandTitle">Gallery OS</h2>
+                    <span id="brandSubtitle">Admin V2.0</span>
+                </div>
+            </div>
+            <div class="sidebar-content">
+                <div class="nav-group">
+                    <div class="nav-title">MAIN</div>
+                    <button class="active" data-page="dashboard">
+                        <i class="bi bi-house-door-fill"> </i>
+                        Dashboard
+                    </button>
+                    <button data-page="albums">
+                        <i class="bi bi-folder-fill"> </i>
+                        Albums
+                    </button>
+                    <button data-page="images">
+                        <i class="bi bi-images"> </i>
+                        Images
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-title">TOOLS</div>
+                    <button data-page="upload">
+                        <i class="bi bi-cloud-upload-fill"> </i>
+                        Upload
+                    </button>
+                    <button data-page="articles">
+                        <i class="bi bi-file-earmark-richtext-fill"> </i>
+                        Articles
+                    </button>
+                    <button data-page="analytics">
+                        <i class="bi bi-bar-chart-fill"> </i>
+                        Analytics
+                    </button>
+                    <button data-page="scanner">
+                        <i class="bi bi-search"> </i>
+                        Scanner
+                    </button>
+                    <button data-page="explorer">
+                        <i class="bi bi-folder2-open"> </i>
+                        Explorer
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-title">AI</div>
+                    <button data-page="assistant">
+                        <i class="bi bi-stars"> </i>
+                        Assistant
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-title">WORKSPACE</div>
+                    <button data-page="settings">
+                        <i class="bi bi-gear-fill"> </i>
+                        Workspace
+                    </button>
+                </div>
+                <div class="nav-spacer"></div>
+            </div>
+            <div class="sidebar-storage">
+                <small>Storage</small>
+                <strong id="sidebarStorage">Loading...</strong>
+            </div>
+            <button class="btn" id="logoutBtn">Logout</button>
+        </aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        <!-- ============================================================
+   AUTHENTICATION
+   Login and access gate
+============================================================ -->
+        <div class="login-screen" id="loginOverlay">
+            <div class="login-card card">
+                <button
+                    class="btn btn-icon login-close"
+                    id="closeLoginBtn"
+                    type="button"
+                >
+                    ×
+                </button>
+
+                <div class="login-lock">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                    >
+                        <rect x="4" y="10" width="16" height="10" rx="2" />
+                        <path d="M8 10V7a4 4 0 118 0v3" />
+                    </svg>
+                </div>
+
+                <h1>Gallery OS</h1>
+                <p>Private Admin Workspace</p>
+
+                <form id="loginForm">
+                    <div class="login-field">
+                        <label for="username"> Username </label>
+
+                        <input
+                            autocomplete="username"
+                            class="input"
+                            id="username"
+                            name="username"
+                            readonly
+                            type="text"
+                            value="admin"
+                        />
+                    </div>
+
+                    <div class="login-field">
+                        <label for="password"> Password </label>
+
+                        <div class="password-wrapper">
+                            <input
+                                autocomplete="current-password"
+                                class="input"
+                                id="password"
+                                name="password"
+                                placeholder="Enter admin password"
+                                required
+                                type="password"
+                            />
+
+                            <button
+                                type="button"
+                                class="password-toggle"
+                                id="passwordToggle"
+                                aria-label="Show password"
+                            >
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="login-error" id="loginError"></div>
+
+                    <button class="btn btn-primary login-submit" type="submit">
+                        Unlock Workspace
+                    </button>
+                </form>
+
+                <small class="login-hint"> Authorized admin access only </small>
+            </div>
+        </div>
+        <!-- ============================================================
+   APPLICATION SHELL
+   Main workspace, pages, topbar, and activity rail
+============================================================ -->
+        <div class="app hidden" id="app">
+            <div class="layout">
+                <!-- PRIMARY WORKSPACE -->
+                <div class="workspace">
+                    <!-- TOPBAR -->
+                    <header class="topbar">
+                        <div class="topbar-left">
+                            <button
+                                class="btn btn-icon"
+                                id="mobileMenuBtn"
+                                data-tooltip="Open menu"
+                            >
+                                ☰
+                            </button>
+                            <div class="mobile-page-title" id="mobilePageTitle">
+                                Dashboard
+                            </div>
+                            <div class="search-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input
+                                    class="input"
+                                    id="globalSearch"
+                                    placeholder="Search albums, images, actions..."
+                                />
+                            </div>
+                        </div>
+                        <div class="topbar-right">
+                            <button
+                                class="btn btn-icon"
+                                id="mobileSearchBtn"
+                                data-tooltip="Search"
+                            >
+                                🔍
+                            </button>
+                            <button
+                                class="btn btn-icon"
+                                id="notificationBtn"
+                                data-tooltip="Activity Notifications"
+                            >
+                                <i class="bi bi-bell-fill"> </i>
+                            </button>
+                            <button
+                                class="btn btn-icon btn-primary"
+                                id="profileBtn"
+                                data-tooltip="Profile menu"
+                            >
+                                <i class="bi bi-person-fill"> </i>
+                            </button>
+                            <div class="profile-menu hidden" id="profileMenu">
+                                <div class="profile-header">
+                                    <div
+                                        class="profile-avatar"
+                                        id="profileAvatar"
+                                    >
+                                        👤
+                                    </div>
+                                    <div>
+                                        <strong id="profileName"
+                                            >Manish Kumar</strong
+                                        >
+                                        <small id="profileStatus"
+                                            >🟢 Workspace Owner</small
+                                        >
+                                    </div>
+                                </div>
+                                <button
+                                    class="btn profile-menu-btn"
+                                    id="profileWorkspaceBtn"
+                                >
+                                    <i class="bi bi-gear"> </i>
+                                    Workspace
+                                </button>
+                                <!-- PROFILE THEME -->
+                                <div class="profile-theme-row">
+                                    <button
+                                        class="btn profile-theme-label"
+                                        id="profileThemeBtn"
+                                        type="button"
+                                        data-tooltip="Theme"
+                                        aria-label="Theme"
+                                    >
+                                        <i class="bi bi-palette-fill"></i>
+                                        <span>Theme</span>
+                                    </button>
+
+                                    <div
+                                        class="theme-menu"
+                                        id="themeMenu"
+                                        aria-label="Theme selection"
+                                    ></div>
+                                </div>
+                                <button
+                                    class="btn profile-menu-btn"
+                                    id="profileBackupBtn"
+                                >
+                                    <i class="bi bi-box-seam"> </i>
+                                    Backups
+                                </button>
+                                <hr />
+                                <button
+                                    class="btn profile-menu-btn"
+                                    id="profileLogoutBtn"
+                                >
+                                    <i class="bi bi-box-arrow-right"> </i>
+                                    Sign Out
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- PAGE CONTENT
+Only page-scrolling region -->
+                    <main class="main-content">
+                        <div class="topbar-actions">
+                            <button
+                                class="btn btn-pill btn-primary"
+                                id="topbarAlbumBtn"
+                            >
+                                + Album
+                            </button>
+                            <button class="btn btn-pill" id="topbarUploadBtn">
+                                Upload
+                            </button>
+                            <button class="btn btn-pill" id="topbarScanBtn">
+                                Scan
+                            </button>
+                        </div>
+
+                        <!-- PAGE: DASHBOARD
+Overview, health, recent uploads, and quick actions -->
+                        <section class="page active" id="dashboardPage">
+                            <div class="page-hero">
+                                <div>
+                                    <span class="hero-eyebrow"
+                                        >Gallery Health</span
+                                    >
+                                    <h1 class="hero-title">Welcome Back</h1>
+                                    <p class="hero-subtitle">
+                                        Your gallery is operating normally.
+                                    </p>
+                                </div>
+                                <div class="health-badge" id="dashboardHealth">
+                                    --
+                                </div>
+                            </div>
+                            <div class="grid-4">
+                                <div class="metric-card card">
+                                    <span>Albums</span>
+                                    <h2 id="albumsCount">0</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Images</span>
+                                    <h2 id="imagesCount">0</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Storage</span>
+                                    <h2 id="storageSize">0 MB</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Uploads Today</span>
+                                    <h2 id="uploadsTodayDashboard">0</h2>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Recent Uploads</h3>
+                                    </div>
+                                    <div
+                                        class="dashboard-upload-list"
+                                        id="recentUploads"
+                                    >
+                                        <div class="list-item">Loading...</div>
+                                    </div>
+                                </div>
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Recent Articles</h3>
+                                    </div>
+
+                                    <div
+                                        class="dashboard-article-list"
+                                        id="recentArticles"
+                                    >
+                                        <div class="list-item">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- PAGE: ALBUMS
+Album management and collection browsing -->
+                        <section class="page" id="albumsPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title">Albums</h1>
+                                    <p class="hero-subtitle">
+                                        Manage gallery collections
+                                    </p>
+                                </div>
+                                <button
+                                    class="btn btn-primary"
+                                    id="newAlbumBtn"
+                                >
+                                    + New Album
+                                </button>
+                            </div>
+                            <div class="toolbar">
+                                <input
+                                    class="input"
+                                    id="albumSearch"
+                                    placeholder="Search albums..."
+                                />
+                                <select class="input" id="albumSort">
+                                    <option value="name">Sort A-Z</option>
+                                    <option value="images">Most Images</option>
+                                    <option value="recent">
+                                        Recently Updated
+                                    </option>
+                                </select>
+                                <button
+                                    class="btn btn-primary"
+                                    id="refreshAlbums"
+                                >
+                                    Refresh
+                                </button>
+                            </div>
+                            <div
+                                class="card panel empty-state hidden"
+                                id="emptyAlbums"
+                            >
+                                <div>📁</div>
+                                <p>No Albums Found</p>
+                                <small>Create your first gallery album.</small>
+                            </div>
+                            <div class="album-grid" id="albumGrid"></div>
+                        </section>
+                        <!-- PAGE: UPLOAD CENTER
+File drop, upload settings, and queue -->
+                        <section class="page" id="uploadPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title">Upload Center</h1>
+                                    <p class="hero-subtitle">
+                                        Drag and drop images
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="upload-layout">
+                                <div class="drop-zone">
+                                    <div class="drop-icon">☁</div>
+                                    <h2>Drop Files Here</h2>
+                                    <p>or click to browse</p>
+                                    <input
+                                        id="uploadFiles"
+                                        multiple=""
+                                        type="file"
+                                    />
+                                </div>
+                                <div class="card panel">
+                                    <h3>Upload Settings</h3>
+                                    <div
+                                        class="custom-select"
+                                        id="uploadAlbumSelect"
+                                    >
+                                        <button
+                                            class="custom-select-btn"
+                                            type="button"
+                                        >
+                                            <span>Select Album</span>
+                                            <span>⌄</span>
+                                        </button>
+                                        <div
+                                            class="custom-select-menu hidden"
+                                        ></div>
+                                    </div>
+                                    <label>
+                                        <input checked="" type="checkbox" />
+                                        Generate Thumbnails
+                                    </label>
+                                    <label>
+                                        <input checked="" type="checkbox" />
+                                        Convert to WebP
+                                    </label>
+                                    <button
+                                        class="btn btn-primary"
+                                        id="uploadBtn"
+                                    >
+                                        Upload
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="upload-queue card panel">
+                                <h3>Upload Queue</h3>
+                            </div>
+                        </section>
+                        <!-- PAGE: ARTICLES
+Article listing and management -->
+                        <section class="page" id="articlesPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title">Articles</h1>
+                                    <p class="hero-subtitle">
+                                        Manage your blog articles
+                                    </p>
+                                </div>
+                                <button
+                                    class="btn btn-primary"
+                                    id="newArticleBtn"
+                                >
+                                    + New Article
+                                </button>
+                            </div>
+                            <div class="toolbar">
+                                <input
+                                    class="input"
+                                    id="articleSearch"
+                                    placeholder="Search articles..."
+                                />
+                                <button class="btn" id="refreshArticlesBtn">
+                                    Refresh
+                                </button>
+                            </div>
+                            <div class="card panel" id="articleList">
+                                Loading...
+                            </div>
+                        </section>
+                        <!-- PAGE: ARTICLE EDITOR
+Metadata, markdown editor, preview, history, SEO, and writing insights -->
+                        <section class="page" id="articleEditorPage">
+
+
+
+                            <div class="page-header">
+
+                                <div class="article-header-main">
+
+                                    <h1 class="hero-title">
+                                        Edit Article
+                                    </h1>
+
+                                    <div class="article-header-subrow">
+
+                                        <p class="hero-subtitle">
+                                            Manage markdown and article metadata
+                                        </p>
+
+                                        
+
+                                    </div>
+
+                                    <div class="article-status-bar">
+
+                                        <span
+                                            class="status-pill draft"
+                                            id="articleStatusBadge"
+                                        >
+                                            Draft
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="article-header-status">
+
+                                            <div
+                                                id="livePreviewStatus"
+                                                class="live-preview-status"
+                                                data-state="closed"
+                                                aria-live="polite"
+                                            >
+                                                <span class="live-preview-status-dot"></span>
+
+                                                <span class="live-preview-status-text">
+                                                    Live Preview Closed
+                                                </span>
+                                            </div>
+                            
+                                            <span
+                                                class="autosave-status"
+                                                id="autosaveStatus"
+                                            >
+                                                Ready
+                                            </span>
+
+                                        </div>
+
+                                        
+                                <div class="header-actions">
+
+                                    <button
+                                        class="btn"
+                                        id="backToArticlesBtn"
+                                        data-tooltip="Back to Articles"
+                                    >
+                                        ← Back
+                                    </button>
+                            
+                                    <button
+                                        class="btn"
+                                        id="publishArticleBtn"
+                                        data-tooltip="Publish Article"
+                                    >
+                                        Publish
+                                    </button>
+                            
+                                    <button
+                                        class="btn"
+                                        id="importArticleBtn"
+                                        data-tooltip="Import Markdown"
+                                    >
+                                        Import
+                                    </button>
+                            
+                                    <input
+                                        accept=".md,text/markdown"
+                                        hidden
+                                        id="importArticleFile"
+                                        type="file"
+                                    />
+                            
+                                    <button
+                                        class="btn"
+                                        id="exportArticleBtn"
+                                        data-tooltip="Export Markdown"
+                                    >
+                                        Export
+                                    </button>
+                            
+                                    <button
+                                        class="btn btn-primary"
+                                        id="saveArticleBtn"
+                                        data-tooltip="Save Article"
+                                    >
+                                        Save
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <div class="article-editor-layout">
+                                <!-- EDITOR SIDEBAR
+Article metadata and publishing options -->
+                                <aside class="article-editor-sidebar">
+                                    <div class="card panel">
+                                        <div
+                                            class="editor-collapse-header"
+                                            id="metaHeader"
+                                        >
+                                            <div>
+                                                <h3
+                                                    class="editor-section-title"
+                                                >
+                                                    📝 Metadata
+                                                </h3>
+                                                <p
+                                                    class="editor-section-subtitle"
+                                                >
+                                                    Article information
+                                                </p>
+                                            </div>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="toggleMetaBtn"
+                                                type="button"
+                                            >
+                                                <i
+                                                    class="bi bi-chevron-up"
+                                                    id="metaArrow"
+                                                >
+                                                </i>
+                                            </button>
+                                        </div>
+                                        <div id="metaContent">
+                                            <div class="editor-meta-grid">
+                                                <div class="editor-field">
+                                                    <label>Title</label>
+                                                    <input
+                                                        class="input"
+                                                        id="metaTitle"
+                                                        type="text"
+                                                    />
+                                                </div>
+                                                <div class="editor-field">
+                                                    <label>Slug</label>
+                                                    <div class="slug-editor">
+                                                        <input
+                                                            class="input"
+                                                            id="metaSlug"
+                                                            spellcheck="false"
+                                                            type="text"
+                                                        />
+                                                        <button
+                                                            class="btn btn-icon"
+                                                            id="renameSlugBtn"
+                                                            data-tooltip="Rename Article Slug"
+                                                            type="button"
+                                                        >
+                                                            <i
+                                                                class="bi bi-pencil"
+                                                            >
+                                                            </i>
+                                                        </button>
+                                                    </div>
+                                                    <div
+                                                        class="slug-status"
+                                                        id="slugStatus"
+                                                    ></div>
+                                                </div>
+                                                <div class="editor-field">
+                                                    <label>Author</label>
+                                                    <input
+                                                        class="input"
+                                                        id="metaAuthor"
+                                                        type="text"
+                                                    />
+                                                </div>
+                                                <div class="editor-field">
+                                                    <label>Role</label>
+                                                    <input
+                                                        class="input"
+                                                        id="metaRole"
+                                                        type="text"
+                                                    />
+                                                </div>
+                                                <div class="editor-field">
+                                                    <label>Date</label>
+                                                    <input
+                                                        class="input"
+                                                        id="metaDate"
+                                                        type="date"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div class="editor-field">
+                                                <label>Hero Image</label>
+                                                <div class="hero-picker">
+                                                    <input
+                                                        class="input"
+                                                        id="metaHero"
+                                                        placeholder="Hero image URL"
+                                                        type="text"
+                                                    />
+                                                    <button
+                                                        class="btn btn-icon"
+                                                        id="pickHeroBtn"
+                                                        data-tooltip="Choose Hero Image"
+                                                        type="button"
+                                                    >
+                                                        <i class="bi bi-images">
+                                                        </i>
+                                                    </button>
+                                                </div>
+                                                <div
+                                                    class="hero-preview empty"
+                                                    id="heroPreview"
+                                                >
+                                                    <div
+                                                        class="hero-preview-placeholder"
+                                                    >
+                                                        No Hero Image Selected
+                                                    </div>
+                                                    <img
+                                                        hidden=""
+                                                        id="heroPreviewImage"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div class="editor-field">
+                                                <label>Tags</label>
+                                                <input
+                                                    class="input"
+                                                    id="metaTags"
+                                                    placeholder="school, memories"
+                                                    type="text"
+                                                />
+                                            </div>
+                                            <div class="editor-options">
+                                                <label class="editor-chip">
+                                                    <input
+                                                        id="metaPopular"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>⭐ Popular</span>
+                                                </label>
+                                                <label class="editor-chip">
+                                                    <input
+                                                        id="metaProtected"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>🔒 Protected</span>
+                                                </label>
+                                                <label class="editor-chip">
+                                                    <input
+                                                        id="metaDraft"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>📝 Draft</span>
+                                                </label>
+                                            </div>
+                                            
+   
+
+
+
+<div class="display-section">
+
+    <div 
+       class="editor-collapse-header"
+       id="displayHeader"
+    >
+        <div>
+            <h3 class="editor-section-title">
+                🖥️ Article Display
+            </h3>
+
+            <p class="editor-section-subtitle">
+                Reader controls and buttons
+            </p>
+        </div>
+        
+       <button
+            class="btn btn-icon"
+            id="toggleDisplayBtn"
+            type="button"
+            >
+            <i 
+                class="bi bi-chevron-up"
+                id="displayArrow"
+            ></i>
+        </button> 
+    
+    
+        
+    </div>
+    
+    <div id="displayContent">
+
+
+    <div class="display-grid">
+
+
+        <div class="display-card">
+
+            <div class="display-icon">
+                🔗
+            </div>
+
+            <div class="display-info">
+                <strong>
+                    Show Original
+                </strong>
+
+                <small>
+                    Show button to original source
+                </small>
+            </div>
+
+
+            <label class="workspace-switch">
+
+                <input
+                    id="metaShowOriginal"
+                    type="checkbox"
+                >
+
+                <span class="workspace-switch-track"></span>
+
+            </label>
+
+        </div>
+
+
+
+
+        <div class="display-card">
+
+            <div class="display-icon">
+                📄
+            </div>
+
+            <div class="display-info">
+
+                <strong>
+                    Show Raw
+                </strong>
+
+                <small>
+                    Show raw markdown button
+                </small>
+
+            </div>
+
+
+            <label class="workspace-switch">
+
+                <input
+                    id="metaShowRaw"
+                    type="checkbox"
+                >
+
+                <span class="workspace-switch-track"></span>
+
+            </label>
+
+        </div>
+
+
+
+
+        <div class="display-card">
+
+            <div class="display-icon">
+                📋
+            </div>
+
+            <div class="display-info">
+
+                <strong>
+                    Show Copy
+                </strong>
+
+                <small>
+                    Show copy link button
+                </small>
+
+            </div>
+
+
+            <label class="workspace-switch">
+
+                <input
+                    id="metaShowCopy"
+                    type="checkbox"
+                >
+
+                <span class="workspace-switch-track"></span>
+
+            </label>
+
+        </div>
+
+
+
+
+        <div class="display-card">
+
+            <div class="display-icon">
+                📤
+            </div>
+
+            <div class="display-info">
+
+                <strong>
+                    Show Share
+                </strong>
+
+                <small>
+                    Show share button
+                </small>
+
+            </div>
+
+
+            <label class="workspace-switch">
+
+                <input
+                    id="metaShowShare"
+                    type="checkbox"
+                >
+
+                <span class="workspace-switch-track"></span>
+
+            </label>
+
+        </div>
+
+
+    </div>
+
+
+
+
+    <div class="editor-field">
+
+        <label>
+            Original URL
+        </label>
+
+
+        <input
+            class="input"
+            id="metaOriginalUrl"
+            placeholder="https://example.com/original-article"
+            type="url"
+        >
+
+
+        <small>
+            URL of the original article (shown when Show Original is enabled)
+        </small>
+
+
+    </div>
+    
+    </div>
+
+
+</div>
+
+
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                </aside>
+                                <!-- EDITOR MAIN
+Markdown workspace and supporting panels -->
+                                <div class="article-editor-main">
+                                    <div class="card panel">
+                                        <div class="panel-title">
+                                            <h3>Markdown</h3>
+                                        </div>
+                                        <!-- EDITOR CONTEXT
+Sticky heading -->
+                                        <div
+                                            class="sticky-heading hidden"
+                                            id="stickyHeading"
+                                        >
+                                            <span class="sticky-heading-level">
+                                            </span>
+                                            <span
+                                                class="sticky-heading-text"
+                                                id="stickyHeadingText"
+                                            >
+                                            </span>
+                                        </div>
+                                        <div class="markdown-toolbar">
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdBoldBtn"
+                                                data-tooltip="Bold (Ctrl+B)"
+                                                type="button"
+                                            >
+                                                <b>B</b>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdItalicBtn"
+                                                data-tooltip="Italic (Ctrl+I)"
+                                                type="button"
+                                            >
+                                                <i>I</i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdH1Btn"
+                                                data-tooltip="Heading 1"
+                                                type="button"
+                                            >
+                                                H1
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdH2Btn"
+                                                data-tooltip="Heading 2"
+                                                type="button"
+                                            >
+                                                H2
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdLinkBtn"
+                                                data-tooltip="Insert Link (Ctrl+K)"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-link-45deg"></i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdQuoteBtn"
+                                                data-tooltip="Block Quote"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-quote"></i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdCodeBtn"
+                                                data-tooltip="Code Block"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-code-slash"></i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="insertImageBtn"
+                                                data-tooltip="Insert Image"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-image"></i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="mdMediaBtn"
+                                                data-tooltip="Media Library"
+                                            >
+                                                <i class="bi bi-images"> </i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon active"
+                                                id="editorModeBtn"
+                                                data-tooltip="Editor"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-pencil-square">
+                                                </i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="splitModeBtn"
+                                                data-tooltip="Split View"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-layout-split">
+                                                </i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="previewModeBtn"
+                                                data-tooltip="Preview"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-eye"> </i>
+                                            </button>
+
+                                            <button
+                                                class="btn btn-icon"
+                                                id="livePreviewBtn"
+                                                data-tooltip="Live Preview"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-globe2"></i>
+                                            </button>
+
+
+
+                                            <button
+                                                class="btn btn-icon"
+                                                id="openPreviewBtn"
+                                                data-tooltip="Open Live Preview in New Tab"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </button>
+
+
+
+                                            <button
+                                                class="btn btn-icon"
+                                                id="toggleFocusBtn"
+                                                data-tooltip="Focus Mode"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-bullseye"> </i>
+                                            </button>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="toggleFullscreenBtn"
+                                                data-tooltip="Fullscreen Writing"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-fullscreen">
+                                                </i>
+                                            </button>
+
+                                            <button
+                                                class="btn btn-icon"
+                                                id="markdownHelpBtn"
+                                                data-tooltip="Markdown Help"
+                                                type="button"
+                                            >
+                                                <i class="bi bi-question-lg"></i>
+                                            </button>
+                                        </div>
+
+
+
+                                           
+
+
+
+                                        <!-- FIND & REPLACE -->
+                                        <div
+                                            class="article-find-bar hidden"
+                                            id="articleFindBar"
+                                        >
+                                            <input
+                                                class="input"
+                                                id="findInput"
+                                                placeholder="Find..."
+                                                type="text"
+                                            />
+                                            <input
+                                                class="input"
+                                                id="replaceInput"
+                                                placeholder="Replace..."
+                                                type="text"
+                                            />
+                                            <button
+                                                class="btn"
+                                                id="findPrevBtn"
+                                                type="button"
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                class="btn"
+                                                id="findNextBtn"
+                                                type="button"
+                                            >
+                                                ↓
+                                            </button>
+                                            <div
+                                                class="find-counter"
+                                                id="findCounter"
+                                            >
+                                                0 / 0
+                                            </div>
+                                            <button
+                                                class="btn"
+                                                id="replaceBtn"
+                                                type="button"
+                                            >
+                                                Replace
+                                            </button>
+                                            <button
+                                                class="btn"
+                                                id="replaceAllBtn"
+                                                type="button"
+                                            >
+                                                All
+                                            </button>
+                                            <label class="editor-chip">
+                                                <input
+                                                    id="findMatchCase"
+                                                    type="checkbox"
+                                                />
+                                                <span>Aa</span>
+                                            </label>
+                                            <button
+                                                class="btn btn-icon"
+                                                id="closeFindBtn"
+                                                type="button"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                        <div class="editor-workspace">
+                                            <div
+                                                class="article-drop-zone"
+                                                id="articleEditorDropZone"
+                                            >
+                                                <textarea
+                                                    id="articleEditor"
+                                                    spellcheck="false"
+                                                ></textarea>
+                                                <div
+                                                    class="slash-menu hidden"
+                                                    id="slashMenu"
+                                                >
+                                                    <div
+                                                        class="slash-results"
+                                                        id="slashResults"
+                                                    ></div>
+                                                </div>
+                                                <div
+                                                    class="slash-menu hidden"
+                                                    id="autocompleteMenu"
+                                                >
+                                                    <div
+                                                        class="slash-results"
+                                                        id="autocompleteResults"
+                                                    ></div>
+                                                </div>
+                                                <div
+                                                    class="article-drop-overlay hidden"
+                                                    id="articleDropOverlay"
+                                                >
+                                                    <i
+                                                        class="bi bi-cloud-arrow-up"
+                                                    >
+                                                    </i>
+                                                    <h3>
+                                                        Drop image to upload
+                                                    </h3>
+                                                    <p>
+                                                        Image will be uploaded
+                                                        and inserted
+                                                        automatically
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div id="articleSplitDivider"></div>
+                                            <div
+                                                class="article-preview hidden"
+                                                id="articlePreview"
+                                            ></div>
+                                        </div>
+                                        <div
+                                            class="article-toc"
+                                            id="articleToc"
+                                        >
+                                            <div class="article-toc-title">
+                                                Contents
+                                            </div>
+                                            <div
+                                                class="article-toc-list"
+                                                id="articleTocList"
+                                            >
+                                                No headings
+                                            </div>
+                                        </div>
+
+
+                                        <div
+                                            class="article-history is-collapsed"
+                                            id="articleHistorySection"
+                                        >
+
+
+                                            <div class="article-history-header">
+                                                <div
+                                                    class="article-history-info"
+                                                >
+                                                    <div
+                                                        class="article-history-heading"
+                                                    >
+                                                        <i
+                                                            class="bi bi-clock-history"
+                                                        >
+                                                        </i>
+                                                        <div
+                                                            class="article-history-title"
+                                                        >
+                                                            Version History
+                                                        </div>
+                                                        <span
+                                                            class="article-history-count"
+                                                            id="historyCount"
+                                                            >0 Versions</span
+                                                        >
+                                                    </div>
+                                                    <div
+                                                        class="article-history-subtitle"
+                                                    >
+                                                        Restore or manage
+                                                        previous revisions of
+                                                        this article.
+                                                    </div>
+                                                </div>
+
+
+                                                <div class="article-history-actions">
+
+                                                    <button
+                                                        class="btn btn-icon"
+                                                        id="toggleArticleHistoryBtn"
+                                                        type="button"
+                                                        aria-expanded="false"
+                                                        data-tooltip="Expand history"
+                                                    >
+                                                        <i class="bi bi-chevron-down"></i>
+                                                    </button>
+
+                                                    <button
+                                                        class="btn btn-icon"
+                                                        data-menu="historyHeaderMenu"
+                                                        data-tooltip="More actions"
+                                                        id="historyHeaderMenuBtn"
+                                                        type="button"
+                                                    >
+                                                        <i class="bi bi-three-dots-vertical"></i>
+                                                    </button>
+
+                                                </div>
+
+
+                                            </div>
+                                            <div
+                                                class="article-history-list"
+                                                id="articleHistoryList"
+                                            >
+                                                No history
+                                            </div>
+                                            <div class="article-history-footer">
+                                                <button
+                                                    class="btn"
+                                                    id="historyLoadMore"
+                                                >
+                                                    Load More
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="article-seo">
+                                            <div class="article-seo-title">
+                                                SEO
+                                            </div>
+                                            <div
+                                                class="seo-score"
+                                                id="articleSeoScore"
+                                            >
+                                                0 / 100
+                                            </div>
+                                            <div
+                                                class="seo-list"
+                                                id="articleSeoList"
+                                            >
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="article-writing-insights">
+                                            <div class="article-writing-title">
+                                                Writing Insights
+                                            </div>
+                                            <div
+                                                class="writing-suggestions"
+                                                id="writingInsights"
+                                            >
+                                                <div class="insight-row">
+                                                    <span>Long Sentences</span>
+                                                    <span
+                                                        id="insightLongSentences"
+                                                        >0</span
+                                                    >
+                                                </div>
+                                                <div class="insight-row">
+                                                    <span>Long Paragraphs</span>
+                                                    <span
+                                                        id="insightLongParagraphs"
+                                                        >0</span
+                                                    >
+                                                </div>
+                                                <div class="insight-row">
+                                                    <span>Readability</span>
+                                                    <span
+                                                        id="insightReadability"
+                                                        >Good</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="writing-suggestion-list"
+                                                id="writingSuggestions"
+                                            ></div>
+                                        </div>
+                                        <div class="article-stats">
+                                            <span id="articleWordCount"
+                                                >0 Words</span
+                                            >
+                                            <span id="articleCharacterCount"
+                                                >0 Characters</span
+                                            >
+                                            <span id="articleReadingTime"
+                                                >0 min read</span
+                                            >
+                                            <span id="articleHeadingCount"
+                                                >0 Headings</span
+                                            >
+                                            <span id="articleImageCount"
+                                                >0 Images</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            
+                             <!-- Floating Undo / Redo -->
+                             
+                             <div class="editor-history-float">
+
+                                 <button
+                                     id="undoEditorBtn"
+                                     class="history-float-btn"
+                                     data-tooltip="Undo (Ctrl + Z)"
+                                     aria-label="Undo"
+                                     type="button"
+                                 >
+                                     ↶
+                                 </button>
+
+
+                                 <button
+                                     id="redoEditorBtn"
+                                     class="history-float-btn"
+                                     data-tooltip="Redo (Ctrl + Y)"
+                                     aria-label="Redo"
+                                     type="button"
+                                 >
+                                     ↷
+                                 </button>
+
+                             </div>
+
+                            
+                            
+                        </section>
+                        <!-- PAGE: IMAGE MANAGER
+Image browsing, filtering, bulk actions, and masonry grid -->
+                        <section class="page" id="imagesPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title" id="imagesPageTitle">
+                                        Image Manager
+                                    </h1>
+                                    <p
+                                        class="hero-subtitle"
+                                        id="imagesPageSubtitle"
+                                    >
+                                        Browse and manage files
+                                    </p>
+                                    <button
+                                        class="hidden btn btn-pill"
+                                        id="backToAlbumsBtn"
+                                    >
+                                        ← Back to Albums
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="toolbar">
+                                <div
+                                    class="custom-select"
+                                    id="imageAlbumFilter"
+                                >
+                                    <button
+                                        class="custom-select-btn"
+                                        type="button"
+                                    >
+                                        <span>All Albums</span>
+                                        <span>⌄</span>
+                                    </button>
+                                    <div
+                                        class="custom-select-menu hidden"
+                                    ></div>
+                                </div>
+                                <input
+                                    class="input"
+                                    id="imageSearch"
+                                    placeholder="Search images..."
+                                />
+                            </div>
+                            <div class="bulk-actions">
+                                <input id="selectAllImages" type="checkbox" />
+                                <button class="btn" id="deleteSelectedBtn">
+                                    Delete Selected
+                                </button>
+                                <button class="btn" id="moveSelectedBtn">
+                                    Move Selected
+                                </button>
+                                <button class="btn" id="downloadZipBtn">
+                                    Download ZIP
+                                </button>
+                                <button class="btn" id="rebuildThumbsBtn">
+                                    Rebuild Thumbnails
+                                </button>
+                            </div>
+                            <div class="masonry-grid" id="imageGrid"></div>
+                        </section>
+                        <!-- PAGE: ANALYTICS
+Metrics, storage, distribution, trends, insights, and activity -->
+                        <section class="page" id="analyticsPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title">Analytics</h1>
+                                    <p class="hero-subtitle">
+                                        Gallery statistics, trends and insights
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="grid-4 analytics-primary-grid">
+                                <div class="metric-card card">
+                                    <div class="metric-icon">📁</div>
+                                    <div class="metric-content">
+                                        <span>Total Albums</span>
+                                        <h2 id="analyticsAlbums">0</h2>
+                                        <small id="albumsGrowthText"> </small>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">📁</div>
+                                    <div class="metric-content">
+                                        <span>Total Images</span>
+                                        <h2 id="analyticsImages">0</h2>
+                                        <small id="imagesGrowthText"> </small>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">💾</div>
+                                    <div class="metric-content">
+                                        <span>Storage Used</span>
+                                        <h2 id="analyticsStorage">0 MB</h2>
+                                        <small id="storageSubtextMetric">
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">📤</div>
+                                    <div class="metric-content">
+                                        <span>Uploads Today</span>
+                                        <h2 id="uploadsToday">0</h2>
+                                        <small id="uploadsChangeText"> </small>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">🏥</div>
+                                    <div class="metric-content">
+                                        <span>Gallery Health</span>
+                                        <h2 id="healthScoreMetric">--</h2>
+
+                                        <small id="healthStatusMetric">
+                                            Checking gallery...
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid-4">
+                                <div class="metric-card card">
+                                    <div class="metric-icon">📁</div>
+                                    <div class="metric-content">
+                                        <span>Largest Album</span>
+                                        <h2 id="largestAlbumAnalytics">-</h2>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">🖼️</div>
+                                    <div class="metric-content">
+                                        <span>Average Image Size</span>
+                                        <h2 id="averageImageSize">0 MB</h2>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">💾</div>
+                                    <div class="metric-content">
+                                        <span>Thumbnail Storage</span>
+                                        <h2 id="spaceSaved">0%</h2>
+                                        <small id="spaceSavedText"> </small>
+                                    </div>
+                                </div>
+                                <div class="metric-card card">
+                                    <div class="metric-icon">📁</div>
+                                    <div class="metric-content">
+                                        <span>Newest Album</span>
+                                        <h2 id="newestAlbum">-</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Storage Breakdown</h3>
+                                    </div>
+                                    <div class="storage-card">
+                                        <div class="storage-chart">
+                                            <svg viewbox="0 0 100 100">
+                                                <defs>
+                                                    <lineargradient
+                                                        id="imagesGradient"
+                                                        x1="0%"
+                                                        x2="100%"
+                                                        y1="100%"
+                                                        y2="0%"
+                                                    >
+                                                        <stop
+                                                            offset="0%"
+                                                            stop-color="#7c5cff"
+                                                        ></stop>
+                                                        <stop
+                                                            offset="50%"
+                                                            stop-color="#8b5cf6"
+                                                        ></stop>
+                                                        <stop
+                                                            offset="100%"
+                                                            stop-color="#5ea8ff"
+                                                        ></stop>
+                                                    </lineargradient>
+                                                    <filter id="storageGlow">
+                                                        <fegaussianblur
+                                                            result="blur"
+                                                            stddeviation="1.5"
+                                                        ></fegaussianblur>
+                                                        <femerge>
+                                                            <femergenode
+                                                                in="blur"
+                                                            ></femergenode>
+                                                            <femergenode
+                                                                in="SourceGraphic"
+                                                            ></femergenode>
+                                                        </femerge>
+                                                    </filter>
+                                                </defs>
+                                                <circle
+                                                    class="chart-bg"
+                                                    cx="50"
+                                                    cy="50"
+                                                    r="40"
+                                                ></circle>
+                                                <circle
+                                                    class="chart-progress images-progress"
+                                                    cx="50"
+                                                    cy="50"
+                                                    id="imagesCircle"
+                                                    r="40"
+                                                ></circle>
+                                                <circle
+                                                    class="chart-progress thumbs-progress"
+                                                    cx="50"
+                                                    cy="50"
+                                                    id="thumbsCircle"
+                                                    r="40"
+                                                ></circle>
+                                            </svg>
+                                            <div class="chart-center">
+                                                <strong id="totalStorage"
+                                                    >0 MB</strong
+                                                >
+                                                <small id="storageSubtext"
+                                                    >Used of 10 GB</small
+                                                >
+                                                <p id="storagePercent">
+                                                    0% used
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="storage-legend">
+                                            <div class="storage-chip">
+                                                <span
+                                                    class="storage-dot images-dot"
+                                                >
+                                                </span>
+                                                <div>
+                                                    <small>Images</small>
+                                                    <strong id="imagesStorage"
+                                                        >0 MB</strong
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="storage-chip">
+                                                <span
+                                                    class="storage-dot thumbs-dot"
+                                                >
+                                                </span>
+                                                <div>
+                                                    <small>Thumbnails</small>
+                                                    <strong id="thumbsStorage"
+                                                        >0 MB</strong
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Album Distribution</h3>
+                                    </div>
+                                    <div class="album-distribution">
+                                        <div class="album-donut">
+                                            <svg viewbox="0 0 100 100">
+                                                <defs>
+                                                    <lineargradient
+                                                        id="albumGradient"
+                                                        x1="0%"
+                                                        x2="100%"
+                                                        y1="0%"
+                                                        y2="100%"
+                                                    >
+                                                        <stop
+                                                            offset="0%"
+                                                            stop-color="#8b5cf6"
+                                                        ></stop>
+                                                        <stop
+                                                            offset="100%"
+                                                            stop-color="#5ea8ff"
+                                                        ></stop>
+                                                    </lineargradient>
+                                                </defs>
+                                                <circle
+                                                    class="donut-bg"
+                                                    cx="50"
+                                                    cy="50"
+                                                    r="32"
+                                                ></circle>
+                                                <g id="albumDonut"></g>
+                                            </svg>
+                                            <div class="donut-center">
+                                                <strong id="albumTotal"
+                                                    >0</strong
+                                                >
+                                                <small>Images</small>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="album-stats"
+                                            id="albumDistributionChart"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-grid">
+                                <div
+                                    class="chart-card card storage-history-card"
+                                >
+                                    <div class="panel-title">
+                                        <div class="storage-growth-heading">
+                                            <h3>Storage Growth</h3>
+
+                                            <small
+                                                id="storageGrowth"
+                                                class="storage-growth-status"
+                                            >
+                                                +0% growth
+                                            </small>
+                                        </div>
+
+                                        <div class="storage-history-settings">
+                                            <button
+                                                class="btn btn-icon"
+                                                id="storageHistorySettingsBtn"
+                                                type="button"
+                                                data-tooltip="Chart settings"
+                                                aria-label="Chart settings"
+                                            >
+                                                <i class="bi bi-gear-fill"></i>
+                                            </button>
+
+                                            <div
+                                                class="storage-history-settings-menu hidden"
+                                                id="storageHistorySettingsMenu"
+                                            >
+                                                <div
+                                                    class="storage-settings-section"
+                                                >
+                                                    <span
+                                                        class="storage-settings-label"
+                                                    >
+                                                        Range
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-range="7D"
+                                                    >
+                                                        <span>7 Days</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-range="1M"
+                                                    >
+                                                        <span>1 Month</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-range="1Y"
+                                                    >
+                                                        <span>1 Year</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+                                                </div>
+
+                                                <div
+                                                    class="storage-settings-divider"
+                                                ></div>
+
+                                                <div
+                                                    class="storage-settings-section"
+                                                >
+                                                    <span
+                                                        class="storage-settings-label"
+                                                    >
+                                                        Unit
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-unit="AUTO"
+                                                    >
+                                                        <span>Auto</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-unit="MB"
+                                                    >
+                                                        <span>MB</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        class="storage-setting-option"
+                                                        data-storage-unit="GB"
+                                                    >
+                                                        <span>GB</span>
+                                                        <i
+                                                            class="bi bi-check2"
+                                                        ></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="storage-history-viewport"
+                                        id="storageHistoryViewport"
+                                    >
+                                        <div
+                                            class="storage-history-axis"
+                                            id="storageHistoryAxis"
+                                        ></div>
+
+                                        <div class="storage-history-scroll">
+                                            <canvas id="storageChart"></canvas>
+                                        </div>
+
+                                        <div
+                                            class="storage-history-custom-scrollbar hidden"
+                                            id="storageHistoryCustomScrollbar"
+                                        >
+                                            <div
+                                                class="storage-history-custom-thumb"
+                                                id="storageHistoryCustomThumb"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-card card">
+                                    <div class="panel-title">
+                                        <h3>Upload Activity</h3>
+                                        <span class="stat-pill" id="uploadTotal"
+                                            >0 Total Uploads</span
+                                        >
+                                    </div>
+                                    <div id="uploadActivityChart"></div>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Gallery Insights</h3>
+                                    </div>
+                                    <div class="insights">
+                                        <div class="insight-item list-item">
+                                            <div class="icon-box">📁</div>
+                                            <div>
+                                                <h4>Most Active Album</h4>
+                                                <p id="mostActiveAlbum">-</p>
+                                            </div>
+                                        </div>
+                                        <div class="insight-item list-item">
+                                            <div class="icon-box">🖼</div>
+                                            <div>
+                                                <h4>Largest Image</h4>
+                                                <p id="largestImage">-</p>
+                                            </div>
+                                        </div>
+                                        <div class="insight-item list-item">
+                                            <div class="icon-box">📅</div>
+                                            <div>
+                                                <h4>Most Active Day</h4>
+                                                <p id="mostActiveDay">-</p>
+                                            </div>
+                                        </div>
+                                        <div class="insight-item list-item">
+                                            <div class="icon-box">🚀</div>
+                                            <div>
+                                                <h4>Newest Album</h4>
+                                                <p id="newestAlbumInsight">-</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>Recent Activity</h3>
+                                    </div>
+                                    <div
+                                        class="timeline"
+                                        id="analyticsActivity"
+                                    >
+                                        <div class="activity-empty">
+                                            Waiting for activity...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- PAGE: SCANNER
+Gallery diagnostics, maintenance, and scan results -->
+                        <section class="page" id="scannerPage">
+                            <div class="page-hero">
+                                <div>
+                                    <span class="hero-eyebrow"
+                                        >SYSTEM MONITOR</span
+                                    >
+                                    <h1 class="hero-title">Gallery Scanner</h1>
+                                    <p class="hero-subtitle">
+                                        Detect issues and perform maintenance
+                                        tasks
+                                    </p>
+                                    <div class="system-banner">
+                                        <div
+                                            class="scanner-status good"
+                                            id="scannerStatus"
+                                        >
+                                            🟢 Healthy
+                                        </div>
+                                        <div id="indexedImages">
+                                            0 Images Indexed
+                                        </div>
+                                        <div id="lastScanBanner">
+                                            Never Scanned
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="health-ring">
+                                    <div>
+                                        <span id="healthScoreBig">100%</span>
+                                        <small id="healthLabel"
+                                            >Excellent</small
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>Maintenance</h3>
+                                </div>
+                                <div class="action-grid">
+                                    <button
+                                        class="btn btn-lg"
+                                        id="scanGalleryBtn"
+                                    >
+                                        🔄 Scan
+                                    </button>
+                                    <button
+                                        class="btn btn-lg"
+                                        id="cleanGalleryBtn"
+                                    >
+                                        🧹 Clean
+                                    </button>
+                                    <button
+                                        class="btn btn-lg"
+                                        id="repairGalleryBtn"
+                                    >
+                                        🔧 Repair
+                                    </button>
+                                    <button
+                                        class="btn btn-lg"
+                                        id="rebuildThumbsScannerBtn"
+                                    >
+                                        🖼 Rebuild
+                                    </button>
+                                    <button
+                                        class="btn btn-lg"
+                                        id="exportReportBtn"
+                                    >
+                                        📋 Report
+                                    </button>
+                                    <button
+                                        class="btn btn-lg"
+                                        id="refreshScannerBtn"
+                                    >
+                                        ♻ Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="grid-4">
+                                <div class="metric-card card">
+                                    <span>Empty Albums</span>
+                                    <h2 id="emptyAlbumsCount">0</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Broken Images</span>
+                                    <h2 id="brokenImagesCount">0</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Duplicate Images</span>
+                                    <h2 id="duplicateImagesCount">0</h2>
+                                </div>
+                                <div class="metric-card card">
+                                    <span>Orphan Thumbnails</span>
+                                    <h2 id="missingThumbsCount">0</h2>
+                                </div>
+                            </div>
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>Scan Summary</h3>
+                                </div>
+                                <div id="scannerSummary"></div>
+                            </div>
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>Scan Results</h3>
+                                </div>
+                                <div class="timeline" id="scannerResults">
+                                    <div class="timeline-item list-item">
+                                        Ready to scan gallery.
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- PAGE: EXPLORER
+                        
+                        
+                        
+Storage tree and workspace filesystem view -->
+<section class="page" id="explorerPage">
+
+<div class="page-header">
+    <div>
+        <h1 class="hero-title">
+            Explorer
+        </h1>
+
+        <p class="hero-subtitle">
+            Browse gallery storage
+        </p>
+    </div>
+</div>
+
+
+<div class="explorer-toolbar">
+
+    <select id="explorerSource">
+        <option value="hybrid">
+            🔄 Hybrid
+        </option>
+
+        <option value="drive">
+            ☁ Drive
+        </option>
+
+        <option value="local">
+            📁 Local
+        </option>
+    </select>
+
+
+    <input
+        id="explorerSearch"
+        placeholder="Search files..."
+    >
+
+    <button
+        id="refreshExplorerBtn"
+        class="btn btn-primary">
+        Refresh
+    </button>
+
+</div>
+
+
+
+<div class="explorer-storage" id="explorerStorage"></div>
+
+
+
+<div class="explorer-layout">
+
+
+    <!-- TREE -->
+
+    <div class="card panel explorer-tree">
+
+        <div id="explorerTree">
+
+            Loading...
+
+        </div>
+
+    </div>
+
+
+
+    <!-- CONTENT -->
+
+    <div class="card panel explorer-content">
+      
+      <div 
+       id="explorerBreadcrumb"
+       class="explorer-breadcrumb">
+
+       Gallery OS
+
+      </div>
+
+        <div id="explorerFiles">
+
+            Select folder
+
+        </div>
+
+    </div>
+
+
+</div>
+
+
+</section>
+
+
+
+
+                        <!-- PAGE: ASSISTANT
+Natural-language workspace actions -->
+                        <section class="page" id="assistantPage">
+                            <div class="page-header">
+                                <div>
+                                    <h1 class="hero-title">AI Center</h1>
+                                    <p class="hero-subtitle">
+                                        Intelligent assistant for your Gallery
+                                        OS workspace
+                                    </p>
+                                </div>
+
+                                <button class="btn" id="refreshAIButton">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    Refresh AI
+                                </button>
+
+                                <div class="health-badge">🤖 Online</div>
+                            </div>
+
+                            <!-- AI CHAT -->
+                            <div class="card panel ai-command-card">
+                                <div class="panel-title">
+                                    <h3>
+                                        <i class="bi bi-stars"></i>
+                                        Ask AI
+                                    </h3>
+                                </div>
+
+                                <p>
+                                    Ask questions or give natural language
+                                    commands.
+                                </p>
+
+                                <div class="ai-input-row">
+                                    <input
+                                        class="input"
+                                        id="aiPromptInput"
+                                        placeholder="
+        Example: Why is scanner slow?
+        "
+                                    />
+
+                                    <button
+                                        class="btn btn-primary"
+                                        id="aiSendBtn"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+
+                                <div class="ai-example-list">
+                                    <button class="btn">
+                                        Find duplicate images
+                                    </button>
+
+                                    <button class="btn">
+                                        Optimize gallery
+                                    </button>
+
+                                    <button class="btn">Explain error</button>
+
+                                    <button class="btn">
+                                        Analyze problems
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- AI FINDINGS -->
+
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>✨ AI Findings</h3>
+                                </div>
+
+                                <div id="aiFindings">
+                                    <div class="ai-loading">
+                                        Loading AI findings...
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI RECOMMENDATIONS -->
+
+                            <div class="grid-2">
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>💡 Recommendations</h3>
+                                    </div>
+
+                                    <div class="ai-list">
+                                        <div>
+                                            Enable better image compression
+                                        </div>
+
+                                        <div>Review unused files</div>
+
+                                        <div>Improve upload naming</div>
+                                    </div>
+                                </div>
+
+                                <div class="card panel">
+                                    <div class="panel-title">
+                                        <h3>⚡ Quick Actions</h3>
+                                    </div>
+
+                                    <div class="ai-actions" id="aiActions">
+                                        <!-- Generated dynamically by assistant.js -->
+
+                                        <div class="ai-loading">
+                                            Loading AI actions...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI ACTIVITY -->
+
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>🧠 AI Activity</h3>
+                                </div>
+
+                                <div class="activity-list">
+                                    <div class="list-item">
+                                        AI analyzed latest scanner result
+                                    </div>
+
+                                    <div class="list-item">
+                                        AI prepared optimization suggestions
+                                    </div>
+
+                                    <div class="list-item">
+                                        AI checked recent system logs
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CHAT HISTORY -->
+
+                            <div class="card panel">
+                                <div class="panel-title">
+                                    <h3>Conversation</h3>
+                                </div>
+
+                                <button class="btn" id="clearAIHistoryBtn">
+                                    Clear Chat
+                                </button>
+
+                                <div
+                                    id="aiConversation"
+                                    class="ai-conversation"
+                                >
+                                    <div class="ai-message">
+                                        Ask AI about your gallery, scanner,
+                                        uploads, or articles.
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- PAGE: WORKSPACE SETTINGS
+Appearance, website, workspace, and behavior settings -->
+                        <section class="page" id="settingsPage">
+                            <div class="page-header workspace-page-header">
+                                <div>
+                                    <h1 class="hero-title">Workspace</h1>
+                                    <p class="hero-subtitle">
+                                        Configure and customize your private
+                                        gallery workspace
+                                    </p>
+                                </div>
+                                <span class="workspace-page-action"
+                                    >Configure Gallery OS</span
+                                >
+                            </div>
+                            <div class="workspace-layout">
+                                <section
+                                    class="workspace-card card appearance-card"
+                                >
+                                    <div class="workspace-card-header">
+                                        <div class="workspace-title">
+                                            🎨 Appearance
+                                        </div>
+                                        <button
+                                            class="workspace-edit-btn"
+                                            id="appearanceEditBtn"
+                                        >
+                                            Edit
+                                        </button>
+                                    </div>
+                                    <div class="appearance-grid">
+                                        <div class="setting-group">
+                                            <label>Theme</label>
+                                            <div class="radio-group">
+                                                <label>
+                                                    <input
+                                                        disabled=""
+                                                        id="themeSystem"
+                                                        name="theme"
+                                                        type="radio"
+                                                    />
+                                                    System
+                                                </label>
+                                                <label>
+                                                    <input
+                                                        disabled=""
+                                                        id="themeDark"
+                                                        name="theme"
+                                                        type="radio"
+                                                    />
+                                                    Dark
+                                                </label>
+                                                <label>
+                                                    <input
+                                                        disabled=""
+                                                        id="themeLight"
+                                                        name="theme"
+                                                        type="radio"
+                                                    />
+                                                    Light
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="setting-group">
+                                            <label>Accent</label>
+                                            <div class="accent-picker">
+                                                <button
+                                                    class="accent-dot"
+                                                    data-color="#6366f1"
+                                                    disabled=""
+                                                ></button>
+                                                <button
+                                                    class="accent-dot"
+                                                    data-color="#3b82f6"
+                                                    disabled=""
+                                                ></button>
+                                                <button
+                                                    class="accent-dot"
+                                                    data-color="#10b981"
+                                                    disabled=""
+                                                ></button>
+                                                <button
+                                                    class="accent-dot"
+                                                    data-color="#f97316"
+                                                    disabled=""
+                                                ></button>
+                                            </div>
+                                        </div>
+                                        <div class="setting-group">
+                                            <label>Effects</label>
+                                            <div class="effect-list">
+                                                <label class="effect-chip">
+                                                    <input
+                                                        disabled=""
+                                                        id="blurEffects"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>Blur Effects</span>
+                                                </label>
+                                                <label class="effect-chip">
+                                                    <input
+                                                        disabled=""
+                                                        id="glassEffects"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>Glass Effects</span>
+                                                </label>
+                                                <label class="effect-chip">
+                                                    <input
+                                                        disabled=""
+                                                        id="pageTransitions"
+                                                        type="checkbox"
+                                                    />
+                                                    <span>Animations</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <div
+                                    class="workspace-grid workspace-grid-primary"
+                                >
+                                    <section class="workspace-card card">
+                                        <div class="workspace-card-header">
+                                            <div class="workspace-title">
+                                                🌐 Website
+                                            </div>
+                                            <button
+                                                class="workspace-edit-btn"
+                                                id="editWebsiteBtn"
+                                                type="button"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                        <div
+                                            class="workspace-summary"
+                                            id="websiteSummary"
+                                        >
+                                            <div class="setting-row">
+                                                <span>Site Title</span>
+                                                <strong id="siteTitleSummary"
+                                                    >Gallery OS</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Description</span>
+                                                <strong
+                                                    id="siteDescriptionSummary"
+                                                    >Private Gallery
+                                                    Workspace</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Navbar Style</span>
+                                                <strong id="navbarSummary"
+                                                    >Compact</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Homepage</span>
+                                                <strong id="homepageSummary"
+                                                    >Dashboard</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Startup</span>
+                                                <strong id="startupModeSummary"
+                                                    >Resume Last Page</strong
+                                                >
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="workspace-editor hidden"
+                                            id="websiteEditor"
+                                        >
+                                            <div class="setting-row">
+                                                <span>Site Title</span>
+                                                <input
+                                                    id="siteTitle"
+                                                    type="text"
+                                                />
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Description</span>
+                                                <input
+                                                    id="siteDescription"
+                                                    type="text"
+                                                />
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Navbar</span>
+                                                <select id="navbarStyle">
+                                                    <option value="compact">
+                                                        Compact
+                                                    </option>
+                                                    <option value="expanded">
+                                                        Expanded
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Homepage</span>
+                                                <select id="homepageSelect">
+                                                    <option value="dashboard">
+                                                        Dashboard
+                                                    </option>
+                                                    <option value="albums">
+                                                        Albums
+                                                    </option>
+                                                    <option value="scanner">
+                                                        Scanner
+                                                    </option>
+                                                    <option value="articles">
+                                                        Articles
+                                                    </option>
+                                                    <option value="explorer">
+                                                        Explorer
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>
+                                                    <strong
+                                                        >Startup
+                                                        Behavior</strong
+                                                    >
+                                                    <small
+                                                        >Choose what opens after
+                                                        a refresh.</small
+                                                    >
+                                                </span>
+                                                <select id="startupMode">
+                                                    <option value="resume">
+                                                        Resume last page
+                                                    </option>
+                                                    <option value="homepage">
+                                                        Always use homepage
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div
+                                                class="workspace-editor-actions"
+                                            >
+                                                <button
+                                                    class="btn btn-primary"
+                                                    id="saveWebsiteBtn"
+                                                    type="button"
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    class="btn workspace-cancel-btn"
+                                                    id="cancelWebsiteBtn"
+                                                    type="button"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="workspace-card card">
+                                        <div class="workspace-card-header">
+                                            <div class="workspace-title">
+                                                🖼 Gallery
+                                            </div>
+                                            <button
+                                                class="workspace-edit-btn"
+                                                id="editGalleryBtn"
+                                                type="button"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                        <div
+                                            class="workspace-summary"
+                                            id="gallerySummary"
+                                        >
+                                            <div class="setting-row">
+                                                <span>Default View</span>
+                                                <strong id="galleryViewSummary"
+                                                    >Masonry</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Thumbnail Size</span>
+                                                <strong id="thumbSizeSummary"
+                                                    >Medium</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Generate WebP</span>
+                                                <strong id="webpSummary"
+                                                    >Enabled</strong
+                                                >
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Auto Thumbnails</span>
+                                                <strong id="thumbsSummary"
+                                                    >Enabled</strong
+                                                >
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="workspace-editor hidden"
+                                            id="galleryEditor"
+                                        >
+                                            <div class="setting-row">
+                                                <span>Default View</span>
+                                                <select id="galleryView">
+                                                    <option value="grid">
+                                                        Grid
+                                                    </option>
+                                                    <option value="masonry">
+                                                        Masonry
+                                                    </option>
+                                                    <option value="list">
+                                                        List
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div class="setting-row">
+                                                <span>Thumbnail Size</span>
+                                                <select id="thumbSize">
+                                                    <option value="small">
+                                                        Small
+                                                    </option>
+                                                    <option value="medium">
+                                                        Medium
+                                                    </option>
+                                                    <option value="large">
+                                                        Large
+                                                    </option>
+                                                </select>
+                                            </div>
+
+                                            <div class="setting-row">
+                                                <span>Generate WebP</span>
+
+                                                <label class="workspace-switch">
+                                                    <input
+                                                        id="webpToggle"
+                                                        type="checkbox"
+                                                    />
+                                                    <span
+                                                        class="workspace-switch-track"
+                                                    ></span>
+                                                </label>
+                                            </div>
+
+                                            <div class="setting-row">
+                                                <span>Auto Thumbnails</span>
+
+                                                <label class="workspace-switch">
+                                                    <input
+                                                        id="thumbsToggle"
+                                                        type="checkbox"
+                                                    />
+                                                    <span
+                                                        class="workspace-switch-track"
+                                                    ></span>
+                                                </label>
+                                            </div>
+
+                                            <div
+                                                class="workspace-editor-actions"
+                                            >
+                                                <button
+                                                    class="btn btn-primary"
+                                                    id="saveGalleryBtn"
+                                                    type="button"
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    class="btn workspace-cancel-btn"
+                                                    id="cancelGalleryBtn"
+                                                    type="button"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <section
+                                    class="workspace-card card access-users-card"
+                                >
+                                    <div
+                                        class="workspace-card-header workspace-collapse-trigger"
+                                    >
+                                        <div>
+                                            <div class="workspace-title">
+                                                👥 Access &amp; Users
+                                            </div>
+                                            <p class="workspace-card-subtitle">
+                                                Manage accounts, passwords and
+                                                access security
+                                            </p>
+                                        </div>
+                                        <div class="workspace-header-actions">
+                                            <span class="workspace-arrow"
+                                                >›</span
+                                            >
+                                            <button
+                                                class="workspace-edit-btn"
+                                                id="securityEditBtn"
+                                                type="button"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="workspace-collapse-content">
+                                        <div class="access-users-grid">
+                                            <div class="access-section">
+                                                <div
+                                                    class="access-section-title"
+                                                >
+                                                    👤 Admin Account
+                                                    <span
+                                                        class="access-badge admin"
+                                                        >Administrator</span
+                                                    >
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Username</span
+                                                    ><strong>admin</strong>
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Role</span
+                                                    ><strong
+                                                        >Administrator</strong
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="workspace-actions access-actions"
+                                                >
+                                                    <button
+                                                        class="workspace-btn"
+                                                        disabled
+                                                        id="changePasswordBtn"
+                                                    >
+                                                        🔑 Change Password
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn danger-btn"
+                                                        disabled
+                                                        id="logoutEverywhereBtn"
+                                                    >
+                                                        🚪 Logout Everywhere
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="access-section">
+                                                <div
+                                                    class="access-section-title"
+                                                >
+                                                    🌐 Frontend Access
+                                                    <span
+                                                        class="access-status success"
+                                                        >● Enabled</span
+                                                    >
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Access Type</span
+                                                    ><strong
+                                                        class="success-text"
+                                                        >Password Protected
+                                                        🔒</strong
+                                                    >
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Username</span
+                                                    ><strong>gallery</strong>
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Status</span
+                                                    ><strong
+                                                        class="success-text"
+                                                        >● Enabled</strong
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="workspace-actions access-actions"
+                                                >
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="changeFrontendPasswordBtn"
+                                                        data-page="manageFrontend"
+                                                        type="button"
+                                                    >
+                                                        ↗ Manage Frontend
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                class="access-section access-security-section"
+                                            >
+                                                <div
+                                                    class="access-section-title"
+                                                >
+                                                    🛡 Access Security
+                                                </div>
+
+                                                <!-- PASTE THE NEW SESSION TIMEOUT HTML HERE -->
+
+                                                <div
+                                                    class="session-timeout-settings"
+                                                >
+                                                    <!-- SESSION TIMEOUT TOGGLE -->
+                                                    <div
+                                                        class="setting-row session-timeout-row"
+                                                    >
+                                                        <div
+                                                            class="session-timeout-info"
+                                                        >
+                                                            <span
+                                                                >Session
+                                                                Timeout</span
+                                                            >
+                                                            <small
+                                                                >Automatically
+                                                                log out inactive
+                                                                sessions</small
+                                                            >
+                                                        </div>
+
+                                                        <label
+                                                            class="workspace-switch"
+                                                        >
+                                                            <input
+                                                                checked
+                                                                disabled
+                                                                id="sessionTimeoutEnabled"
+                                                                type="checkbox"
+                                                            />
+                                                            <span
+                                                                class="workspace-switch-track"
+                                                            ></span>
+                                                        </label>
+                                                    </div>
+
+                                                    <!-- TIMEOUT DURATION -->
+                                                    <div
+                                                        class="setting-row session-timeout-duration"
+                                                    >
+                                                        <span
+                                                            >Timeout
+                                                            Duration</span
+                                                        >
+
+                                                        <div
+                                                            class="timeout-input"
+                                                        >
+                                                            <input
+                                                                disabled
+                                                                id="sessionTimeout"
+                                                                min="1"
+                                                                type="number"
+                                                            />
+
+                                                            <select
+                                                                class="timeout-unit"
+                                                                disabled
+                                                                id="sessionTimeoutUnit"
+                                                            >
+                                                                <option
+                                                                    value="min"
+                                                                >
+                                                                    Min
+                                                                </option>
+                                                                <option
+                                                                    value="hr"
+                                                                >
+                                                                    Hr
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- REQUIRE LOGIN -->
+                                                    <div class="setting-row">
+                                                        <span
+                                                            >Require Login</span
+                                                        >
+
+                                                        <label
+                                                            class="workspace-switch"
+                                                        >
+                                                            <input
+                                                                disabled
+                                                                id="requireLogin"
+                                                                type="checkbox"
+                                                            />
+                                                            <span
+                                                                class="workspace-switch-track"
+                                                            ></span>
+                                                        </label>
+                                                    </div>
+
+                                                    <!-- HIDE DIRECT URLS -->
+                                                    <div class="setting-row">
+                                                        <span
+                                                            >Hide Direct
+                                                            URLs</span
+                                                        >
+
+                                                        <label
+                                                            class="workspace-switch"
+                                                        >
+                                                            <input
+                                                                disabled
+                                                                id="hideDirectUrls"
+                                                                type="checkbox"
+                                                            />
+                                                            <span
+                                                                class="workspace-switch-track"
+                                                            ></span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <div
+                                    class="workspace-grid workspace-grid-bottom"
+                                >
+                                    <div class="workspace-system-card card">
+                                        <div class="workspace-system-header">
+                                            <div class="workspace-title">
+                                                <span>⚙ System</span>
+                                            </div>
+                                        </div>
+
+                                        <section class="workspace-card card">
+                                            <div
+                                                class="workspace-title workspace-collapse-trigger"
+                                            >
+                                                <span>💾 Storage</span>
+                                                <span class="workspace-arrow"
+                                                    >›</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="workspace-collapse-content"
+                                            >
+                                                <div class="setting-row">
+                                                    <span>Storage Used</span>
+                                                    <strong id="storageUsed"
+                                                        >0 MB</strong
+                                                    >
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span>Thumbnail Cache</span>
+                                                    <strong id="thumbCacheSize"
+                                                        >0 MB</strong
+                                                    >
+                                                </div>
+                                                <div class="workspace-actions">
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="clearCacheBtn"
+                                                    >
+                                                        🗑 Clear Cache
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="rebuildThumbsWorkspaceBtn"
+                                                    >
+                                                        🖼 Rebuild Thumbnails
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="exportMetadataBtn"
+                                                    >
+                                                        ⬇ Export Metadata
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section class="workspace-card card">
+                                            <div
+                                                class="workspace-title workspace-collapse-trigger"
+                                            >
+                                                <span>📦 Backups</span>
+                                                <span class="workspace-arrow"
+                                                    >›</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="workspace-collapse-content"
+                                            >
+                                                <div class="setting-row">
+                                                    <span>Last Backup</span>
+                                                    <strong id="lastBackupDate"
+                                                        >Never</strong
+                                                    >
+                                                </div>
+                                                <div class="workspace-actions">
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="createBackupBtn"
+                                                    >
+                                                        📦 Create Backup
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="downloadBackupBtn"
+                                                    >
+                                                        ⬇ Download Backup
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="restoreBackupBtn"
+                                                    >
+                                                        ♻ Restore Backup
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section class="workspace-card card">
+                                            <div
+                                                class="workspace-title workspace-collapse-trigger"
+                                            >
+                                                <span>⚡ Performance</span>
+                                                <span class="workspace-arrow"
+                                                    >›</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="workspace-collapse-content"
+                                            >
+                                                <div class="setting-row">
+                                                    <span>Image Cache</span>
+                                                    <strong
+                                                        id="imageCacheHealth"
+                                                        >100%</strong
+                                                    >
+                                                </div>
+                                                <div class="setting-row">
+                                                    <span
+                                                        >Thumbnail Health</span
+                                                    >
+                                                    <strong id="thumbHealth"
+                                                        >100%</strong
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="performance-actions"
+                                                >
+                                                    <button
+                                                        class="workspace-btn"
+                                                        id="cleanTempBtn"
+                                                    >
+                                                        Clean Temp Files
+                                                    </button>
+                                                    <button
+                                                        class="workspace-btn primary"
+                                                        id="optimizeBtn"
+                                                    >
+                                                        Optimize
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    </div>
+
+                                    <section
+                                        class="workspace-card card about-card"
+                                    >
+                                        <div
+                                            class="workspace-title workspace-collapse-trigger"
+                                        >
+                                            <span>ℹ About</span>
+                                            <span class="workspace-arrow"
+                                                >›</span
+                                            >
+                                        </div>
+                                        <div class="workspace-collapse-content">
+                                            <div class="about-grid">
+                                                <div>
+                                                    <small>Gallery OS</small>
+                                                    <strong id="aboutVersion"
+                                                        >Loading...</strong
+                                                    >
+                                                </div>
+                                                <div>
+                                                    <small>Frontend</small>
+                                                    <strong id="aboutFrontend"
+                                                        >Loading...</strong
+                                                    >
+                                                </div>
+                                                <div>
+                                                    <small>Backend URL</small>
+                                                    <strong id="aboutBackend"
+                                                        >Loading...</strong
+                                                    >
+                                                </div>
+                                                <div>
+                                                    <small>Storage Path</small>
+                                                    <strong id="aboutStorage"
+                                                        >Loading...</strong
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- PAGE: MANAGE FRONTEND ACCESS
+Separate frontend credential management page -->
+                        <section class="page" id="manageFrontendPage">
+                            <div class="manage-frontend-header">
+                                <button
+                                    class="btn manage-frontend-back"
+                                    id="backToWorkspaceBtn"
+                                    data-page="settings"
+                                    type="button"
+                                >
+                                    ← Back to Workspace
+                                </button>
+                                <div>
+                                    <h1 class="hero-title">
+                                        Manage Frontend Access
+                                    </h1>
+                                    <p class="hero-subtitle">
+                                        Manage separate usernames and passwords
+                                        for each frontend
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="frontend-account-grid">
+                                <article class="frontend-account-card card">
+                                    <div class="frontend-account-header">
+                                        <div
+                                            class="frontend-account-icon gallery"
+                                        >
+                                            <i class="bi bi-images"></i>
+                                        </div>
+                                        <div class="frontend-account-heading">
+                                            <h3>Gallery Frontend</h3>
+                                            <p>Public gallery access</p>
+                                        </div>
+                                        <span
+                                            id="galleryFrontendStatus"
+                                            class="frontend-account-status"
+                                            >● Enabled</span
+                                        >
+                                    </div>
+
+                                    <div class="frontend-account-details">
+                                        <div class="setting-row">
+                                            <span>Username</span>
+                                            <strong>gallery</strong>
+                                        </div>
+
+                                        <div class="setting-row">
+                                            <span>Password</span>
+
+                                            <div class="frontend-password-view">
+                                                <strong
+                                                    class="frontend-password-mask"
+                                                    id="galleryFrontendPassword"
+                                                >
+                                                    ••••••••
+                                                </strong>
+
+                                                <button
+                                                    class="btn btn-icon password-eye-btn"
+                                                    id="galleryPasswordEye"
+                                                    type="button"
+                                                    title="Show password"
+                                                >
+                                                    👁
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="frontend-account-meta"
+                                        id="galleryFrontendUpdated"
+                                    >
+                                        Last updated: Never
+                                    </div>
+
+                                    <button
+                                        class="workspace-btn frontend-change-password"
+                                        id="galleryFrontendPasswordBtn"
+                                        type="button"
+                                    >
+                                        🔑 Change Password
+                                    </button>
+                                </article>
+
+                                <article class="frontend-account-card card">
+                                    <div class="frontend-account-header">
+                                        <div
+                                            class="frontend-account-icon articles"
+                                        >
+                                            <i
+                                                class="bi bi-file-earmark-text-fill"
+                                            ></i>
+                                        </div>
+                                        <div class="frontend-account-heading">
+                                            <h3>Articles Frontend</h3>
+                                            <p>Public articles access</p>
+                                        </div>
+                                        <span
+                                            id="articlesFrontendStatus"
+                                            class="frontend-account-status"
+                                            >● Enabled</span
+                                        >
+                                    </div>
+
+                                    <div class="frontend-account-details">
+                                        <div class="setting-row">
+                                            <span>Username</span>
+                                            <strong>articles</strong>
+                                        </div>
+
+                                        <div class="setting-row">
+                                            <span>Password</span>
+
+                                            <div class="frontend-password-view">
+                                                <strong
+                                                    class="frontend-password-mask"
+                                                    id="articlesFrontendPassword"
+                                                >
+                                                    ••••••••
+                                                </strong>
+
+                                                <button
+                                                    class="btn btn-icon password-eye-btn"
+                                                    id="articlesPasswordEye"
+                                                    type="button"
+                                                    title="Show password"
+                                                >
+                                                    👁
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="frontend-account-meta"
+                                        id="articlesFrontendUpdated"
+                                    >
+                                        Last updated: Never
+                                    </div>
+
+                                    <button
+                                        class="workspace-btn frontend-change-password"
+                                        id="articlesFrontendPasswordBtn"
+                                        type="button"
+                                    >
+                                        🔑 Change Password
+                                    </button>
+                                </article>
+                            </div>
+                        </section>
+
+                        <div class="media-menu hidden" id="globalActionMenu">
+                            <!-- Dynamically populated context action menu -->
+                        </div>
+                    </main>
+                </div>
+                <!-- ACTIVITY RAIL
+Secondary workspace rail -->
+                <aside class="activity-rail">
+                    <div class="rail-header">
+                        <h3>Activity</h3>
+                        <button class="mobile-menu-btn" id="closeRailBtn">
+                            ✕
+                        </button>
+                    </div>
+                    <div class="rail-status">
+                        <span> </span>
+                        Live Updates
+                    </div>
+
+                    <div class="rail-card hidden" id="backgroundTasks">
+                        <h3>Background Tasks</h3>
+
+                        <div class="timeline" id="backgroundTasksList"></div>
+                    </div>
+
+                    <div
+                        class="activity-rail-splitter"
+                        id="activityRailSplitter"
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Resize activity sections"
+                    ></div>
+
+                    <div class="rail-card card" id="activityLogs">
+                        <h3>Logs</h3>
+
+                        <div class="timeline" id="activityFeed"></div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+        <!-- ============================================================
+   GLOBAL MODALS
+   Viewport-level dialogs kept outside the page-scrolling region
+============================================================ -->
+        <!-- IMAGE VIEWER -->
+        <div class="modal" id="imageModal">
+            <div class="modal-content image-modal">
+                <button class="btn btn-icon modal-close" id="closeModal">
+                    ×
+                </button>
+                <img alt="" id="modalImage" src="" />
+            </div>
+        </div>
+
+
+<!-- FILE VIEWER MODAL -->
+
+<div
+    id="fileViewerModal"
+    class="explorer-modal"
+>
+
+    <div class="explorer-modal-backdrop"></div>
+
+    <div class="explorer-file-viewer">
+
+        <div class="explorer-file-viewer-header">
+
+            <strong id="fileViewerTitle">
+                File
+            </strong>
+
+            <button
+                type="button"
+                class="btn-icon"
+                id="closeFileViewer"
+                aria-label="Close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="explorer-file-viewer-body">
+
+            <pre
+                id="fileViewerContent"
+            ></pre>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+        <!-- CHANGE PASSWORD -->
+        <div class="modal" id="passwordModal">
+            <div class="modal-content info-modal">
+                <h2>Change Password</h2>
+                <form id="changePasswordForm">
+                    <input
+                        autocomplete="username"
+                        class="password-username"
+                        name="username"
+                        tabindex="-1"
+                        type="text"
+                        value="admin"
+                    />
+                    <div class="password-fields">
+                        <input
+                            autocomplete="current-password"
+                            class="input"
+                            id="currentPassword"
+                            placeholder="Current Password"
+                            type="password"
+                        />
+                        <input
+                            autocomplete="new-password"
+                            class="input"
+                            id="newPassword"
+                            placeholder="New Password"
+                            type="password"
+                        />
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn" id="cancelPasswordBtn">
+                            Cancel
+                        </button>
+                        <button
+                            class="btn btn-primary"
+                            id="savePasswordBtn"
+                            type="button"
+                        >
+                            Change Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- NEW ARTICLE -->
+        <div class="modal" id="newArticleModal">
+            <div class="modal-content info-modal">
+                <h2>New Article</h2>
+                <div class="password-fields">
+                    <input
+                        class="input"
+                        id="newArticleTitle"
+                        placeholder="Article title"
+                        type="text"
+                    />
+                    <input
+                        class="input"
+                        id="newArticleSlug"
+                        placeholder="article-slug"
+                        type="text"
+                    />
+                </div>
+                <div class="modal-actions">
+                    <button class="btn" id="cancelNewArticleBtn">Cancel</button>
+                    <button class="btn btn-primary" id="createNewArticleBtn">
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- IMAGE PICKER -->
+        <div class="modal" id="imagePickerModal">
+            <div class="modal-content image-picker-modal">
+                <div class="panel-title">
+                    <h2>Select Image</h2>
+                    <button class="btn" id="closeImagePickerBtn">✕</button>
+                </div>
+                <input
+                    class="input"
+                    id="imagePickerSearch"
+                    placeholder="Search images..."
+                />
+                <div class="image-picker-grid" id="imagePickerGrid">
+                    Loading...
+                </div>
+            </div>
+        </div>
+        <!-- ARTICLE MEDIA LIBRARY -->
+        <div class="modal" id="articleMediaModal">
+            <div class="modal-card article-media-modal">
+                <div class="modal-header article-media-header">
+                    <div class="article-media-title">
+                        <h2>Article Media</h2>
+                        <p>Manage images and files for this article.</p>
+                    </div>
+                    <button
+                        class="btn btn-icon article-media-close"
+                        id="closeArticleMediaBtn"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div class="article-media-content">
+                    <div class="article-media-toolbar">
+                        <div class="article-media-toolbar-left">
+                            <button
+                                class="btn btn-primary"
+                                id="uploadArticleMediaBtn"
+                            >
+                                <i class="bi bi-cloud-upload"> </i>
+                                Upload
+                            </button>
+                        </div>
+                        <div class="article-media-toolbar-right">
+                            <select
+                                class="input media-toolbar-btn"
+                                id="articleMediaType"
+                            >
+                                <option value="all">All</option>
+                                <option value="images">Images</option>
+                                <option value="files">Files</option>
+                            </select>
+                            <select
+                                class="input media-toolbar-btn"
+                                id="articleMediaScope"
+                            >
+                                <option value="current">Current Article</option>
+                                <option value="shared">Shared</option>
+                                <option value="everything">Everything</option>
+                            </select>
+                            <select
+                                class="input media-toolbar-btn"
+                                id="articleMediaSort"
+                            >
+                                <option value="newest">Newest</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="az">Article A–Z</option>
+                                <option value="za">Article Z–A</option>
+                            </select>
+                            <div class="article-media-search">
+                                <input
+                                    class="input"
+                                    id="articleMediaSearch"
+                                    placeholder="Search media..."
+                                />
+                                <i class="bi bi-search"> </i>
+                            </div>
+                        </div>
+                    </div>
+                    <input
+                        accept="image/*"
+                        hidden=""
+                        id="articleMediaFiles"
+                        multiple=""
+                        type="file"
+                    />
+                    <div
+                        class="upload-progress hidden"
+                        id="articleUploadProgress"
+                    >
+                        <div
+                            class="upload-progress-bar"
+                            id="articleUploadProgressBar"
+                        ></div>
+                        <span id="articleUploadProgressText">Uploading...</span>
+                    </div>
+                    <div class="article-media-grid" id="articleMediaGrid">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+            <div class="media-unsaved-bar hidden" id="mediaUnsavedBar">
+                <div class="media-unsaved-info">
+                    <div class="media-unsaved-icon">
+                        <i class="bi bi-file-earmark"> </i>
+                    </div>
+                    <div>
+                        <strong>
+                            <span id="unsavedMediaCount">0</span>
+                            unsaved media
+                        </strong>
+                        <small>Save uploaded media.</small>
+                    </div>
+                </div>
+                <div class="media-unsaved-actions">
+                    <button class="btn" id="discardMediaBtn">Discard</button>
+                    <button class="btn btn-primary" id="saveMediaBtn">
+                        Save Media
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- MOVE ARTICLE -->
+        <div class="modal hidden" id="moveArticleModal">
+            <div class="modal-content article-picker-card">
+                <div class="move-article-header">
+                    <h3>Move to Article</h3>
+                    <input
+                        class="input"
+                        id="moveArticleSearch"
+                        placeholder="Search article..."
+                    />
+                </div>
+                <div class="article-picker-list" id="moveArticleList"></div>
+                <div class="modal-actions">
+                    <button class="btn" id="cancelMoveArticle">Cancel</button>
+                    <button
+                        class="btn btn-primary"
+                        disabled=""
+                        id="confirmMoveArticle"
+                    >
+                        Move
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- ============================================================
+   GLOBAL MENUS
+   Context menus and floating action surfaces
+============================================================ -->
+
+        <!-- EXPLORER CONTEXT MENU -->
+        <div class="explorer-menu hidden" id="explorerMenu">
+            <button data-action="preview">🖼 Preview Image</button>
+            <button data-action="metadata">ℹ Show Metadata</button>
+            <button data-action="manager">📂 Open in Image Manager</button>
+            <button data-action="download">⬇ Download</button>
+            <button data-action="copy">🔗 Copy URL</button>
+        </div>
+        <!-- ============================================================
+   COMMAND PALETTE
+============================================================ -->
+        <div class="command-overlay hidden" id="commandOverlay">
+            <!-- COMMAND RESULTS -->
+            <div class="command-palette" id="commandPalette">
+                <!-- COMMAND SEARCH -->
+                <div class="command-search">
+                    <svg viewbox="0 0 24 24">
+                        <path
+                            d="M21 21l-4.3-4.3m1.3-5.2a6.5 6.5 0 11-13 0a6.5 6.5 0 0113 0z"
+                        ></path>
+                    </svg>
+                    <input
+                        autocomplete="off"
+                        id="commandInput"
+                        placeholder="Search albums, images and actions"
+                        type="text"
+                    />
+                </div>
+                <div class="command-results" id="commandResults">
+                    <div class="command-section">Top Results</div>
+                </div>
+                <!-- COMMAND SHORTCUTS -->
+                <div class="command-footer">
+                    <div class="command-shortcut">↑↓ Navigate</div>
+                    <div class="command-shortcut">↵ Select</div>
+                    <div class="command-shortcut">ESC Close</div>
+                </div>
+            </div>
+        </div>
+        <!-- ============================================================
+   GLOBAL FEEDBACK
+   Toast and transient notifications
+============================================================ -->
+        <div id="toast"></div>
+
+        <!-- Markdown Help Modal -->
+
+        <div class="modal hidden" id="markdownHelpModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Markdown Help</h3>
+
+                    <button class="btn btn-icon" id="closeMarkdownHelpBtn">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="help-content" id="markdownHelpContent">
+                    <!-- Dynamically rendered by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SCRIPTS: CORE -->
+        <script src="js/core/config.js"></script>
+        <script src="js/core/state.js"></script>
+        <script src="js/core/utils.js"></script>
+        <script src="js/core/api.js"></script>
+        <script src="js/core/dom.js"></script>
+        <!-- SCRIPTS: UI LAYER -->
+        <script src="js/modules/ui.js"></script>
+        <!-- SCRIPTS: FEATURE MODULES -->
+        <script src="js/modules/gallery.js"></script>
+        <script src="js/modules/upload.js"></script>
+        <script src="js/modules/articles.js"></script>
+        <script src="js/modules/scanner.js"></script>
+        <script src="js/modules/analytics.js"></script>
+        <script src="js/modules/dashboard.js"></script>
+        <script src="js/modules/explorer.js"></script>
+        <script src="js/modules/assistant.js"></script>
+
+        <script src="js/modules/workspace.js"></script>
+        <script src="js/modules/search.js"></script>
+        <script src="js/modules/system.js"></script>
+        <!-- SCRIPTS: APPLICATION BOOTSTRAP -->
+        <script src="admin.js"></script>
+        
+       <!-- <script src="js/devtools.js"></script>  -->
+        
+        <!-- SCRIPTS: RUNTIME / SERVICE WORKER -->
+        <script>
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.register("./sw.js").catch(error => {
+                    console.error("Service worker registration failed:", error);
+                });
+            }
+        </script>
+    </body>
+</html>
+
+

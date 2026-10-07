@@ -1,0 +1,396 @@
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const DRIVE_API = "https://www.googleapis.com/drive/v3";
+
+let cachedToken = null;
+let tokenExpiresAt = 0;
+
+function pemToArrayBuffer(pem) {
+  const normalized = String(pem)
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "")
+    .trim();
+
+  const base64 = normalized
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s/g, "");
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+function base64url(input) {
+  const bytes = new TextEncoder().encode(input);
+
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function arrayBufferToBase64url(buffer) {
+  const bytes = new Uint8Array(buffer);
+
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function createJwt(env) {
+  const now = Math.floor(Date.now() / 1000);
+
+  const header = {
+    alg: "RS256",
+    typ: "JWT"
+  };
+
+  const payload = {
+    iss: env.GOOGLE_CLIENT_EMAIL,
+    scope: "https://www.googleapis.com/auth/drive",
+    aud: TOKEN_URL,
+    iat: now,
+    exp: now + 3600
+  };
+
+  const encodedHeader =
+    base64url(JSON.stringify(header));
+
+  const encodedPayload =
+    base64url(JSON.stringify(payload));
+
+  const unsignedToken =
+    `${encodedHeader}.${encodedPayload}`;
+
+  const key =
+    await crypto.subtle.importKey(
+      "pkcs8",
+      pemToArrayBuffer(
+        env.GOOGLE_PRIVATE_KEY
+      ),
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256"
+      },
+      false,
+      ["sign"]
+    );
+
+  const signature =
+    await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      new TextEncoder().encode(
+        unsignedToken
+      )
+    );
+
+  return (
+    `${unsignedToken}.` +
+    arrayBufferToBase64url(signature)
+  );
+}
+
+async function getAccessToken(env) {
+  if (
+    cachedToken &&
+    Date.now() < tokenExpiresAt
+  ) {
+    return cachedToken;
+  }
+
+  const assertion =
+    await createJwt(env);
+
+  const response =
+    await fetch(
+      TOKEN_URL,
+      {
+        method: "POST",
+
+        headers: {
+          "content-type":
+            "application/x-www-form-urlencoded"
+        },
+
+        body: new URLSearchParams({
+          grant_type:
+            "urn:ietf:params:oauth:grant-type:jwt-bearer",
+
+          assertion
+        })
+      }
+    );
+
+  if (!response.ok) {
+    const error =
+      await response.text();
+
+    throw new Error(
+      `Google token request failed: ${response.status} ${error}`
+    );
+  }
+
+  const data =
+    await response.json();
+
+  cachedToken =
+    data.access_token;
+
+  tokenExpiresAt =
+    Date.now() +
+    ((data.expires_in || 3600) - 60) *
+      1000;
+
+  return cachedToken;
+}
+
+export async function driveFetch(
+  env,
+  path,
+  options = {}
+) {
+  const token =
+    await getAccessToken(env);
+
+  const headers =
+    new Headers(
+      options.headers || {}
+    );
+
+  headers.set(
+    "authorization",
+    `Bearer ${token}`
+  );
+
+  return fetch(
+    `${DRIVE_API}${path}`,
+    {
+      ...options,
+      headers
+    }
+  );
+}
+
+async function checkedDriveFetch(
+  env,
+  path,
+  options = {}
+) {
+  const response =
+    await driveFetch(
+      env,
+      path,
+      options
+    );
+
+  if (!response.ok) {
+    const error =
+      await response.text();
+
+    throw new Error(
+      `Google Drive API failed: ${response.status} ${error}`
+    );
+  }
+
+  return response;
+}
+
+export async function getDriveFile(
+  env,
+  fileId
+) {
+  const response =
+    await checkedDriveFetch(
+      env,
+      `/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,modifiedTime,createdTime,parents`
+    );
+
+  return response.json();
+}
+
+export async function listDriveFiles(
+  env,
+  query,
+  fields =
+    "files(id,name,mimeType,size,modifiedTime,createdTime,parents)",
+  pageToken = null,
+  pageSize = 1000
+) {
+  const params =
+    new URLSearchParams({
+      q: query,
+      fields,
+      pageSize: String(pageSize)
+    });
+    
+    if (pageToken) {
+      params.set("pageToken", pageToken);
+    }
+
+  const response =
+    await checkedDriveFetch(
+      env,
+      `/files?${params.toString()}`
+    );
+
+  return response.json();
+}
+
+export async function downloadDriveFile(
+  env,
+  fileId
+) {
+  return checkedDriveFetch(
+    env,
+    `/files/${encodeURIComponent(fileId)}?alt=media`
+  );
+}
+
+export async function updateDriveFile(
+  env,
+  fileId,
+  body,
+  mimeType = "application/json"
+) {
+  const response =
+    await checkedDriveFetch(
+      env,
+      `/files/${encodeURIComponent(fileId)}`,
+      {
+        method: "PATCH",
+
+        headers: {
+          "content-type":
+            mimeType
+        },
+
+        body
+      }
+    );
+
+  return response.json();
+}
+
+export async function createDriveFile(
+  env,
+  name,
+  parentId,
+  body,
+  mimeType = "application/json"
+) {
+  const metadata = {
+    name,
+    parents: [parentId],
+    mimeType
+  };
+
+  const boundary =
+    `----GalleryWorker${crypto.randomUUID()}`;
+
+  const encoder =
+    new TextEncoder();
+
+  const metadataPart =
+    JSON.stringify(metadata);
+
+  const bodyBytes =
+    typeof body === "string"
+      ? encoder.encode(body)
+      : body;
+
+  const prefix =
+    encoder.encode(
+      `--${boundary}\r\n` +
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+      `${metadataPart}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: ${mimeType}\r\n\r\n`
+    );
+
+  const suffix =
+    encoder.encode(
+      `\r\n--${boundary}--\r\n`
+    );
+
+  const combined =
+    new Uint8Array(
+      prefix.byteLength +
+      bodyBytes.byteLength +
+      suffix.byteLength
+    );
+
+  combined.set(prefix, 0);
+
+  combined.set(
+    bodyBytes,
+    prefix.byteLength
+  );
+
+  combined.set(
+    suffix,
+    prefix.byteLength +
+      bodyBytes.byteLength
+  );
+
+  const response =
+    await checkedDriveFetch(
+      env,
+      "/files?uploadType=multipart&fields=id,name,mimeType,createdTime,modifiedTime",
+      {
+        method: "POST",
+
+        headers: {
+          "content-type":
+            `multipart/related; boundary=${boundary}`
+        },
+
+        body: combined
+      }
+    );
+
+  return response.json();
+}
+
+export async function updateDriveFileMedia(
+  env,
+  fileId,
+  body,
+  mimeType = "application/json"
+) {
+  const response =
+    await checkedDriveFetch(
+      env,
+      `/files/${encodeURIComponent(fileId)}?uploadType=media`,
+      {
+        method: "PATCH",
+
+        headers: {
+          "content-type":
+            mimeType
+        },
+
+        body
+      }
+    );
+
+  return response.json();
+}

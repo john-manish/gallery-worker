@@ -1,0 +1,1394 @@
+// ============================================================
+// PUBLIC ARTICLE API
+// Cloudflare Worker version
+//
+// Google Drive = article source of truth
+// ARTICLE_CACHE KV = article/index cache
+// Worker memory = handled by existing providers
+//
+// Public API:
+//
+// GET  /articles
+// GET  /articles/popular
+// GET  /articles/:slug
+// GET  /articles/:slug/status
+// GET  /articles/:slug/content
+// GET  /articles/:slug/raw
+//
+// POST /articles/login
+// POST /articles/logout
+// ============================================================
+
+import {
+  getArticleBySlug,
+  listArticles
+} from "../articles/articleDrive.js";
+
+import {
+  verifyFrontendPassword
+} from "../auth/frontendAuthDrive.js";
+
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const ARTICLE_COOKIE = "article_session";
+
+const ARTICLE_SESSION_MAX_AGE =
+  60 * 60 * 24 * 30;
+
+
+// ============================================================
+// CORS
+// ============================================================
+//
+// Recommended Worker environment variable:
+//
+// PUBLIC_ORIGIN=https://your-public-site.com
+//
+// Fallbacks:
+// ALLOWED_ORIGIN
+// FRONTEND_ORIGIN
+//
+// Credentials are enabled because article_session is
+// stored in a cookie.
+//
+// Never use "*" with credentials.
+// ============================================================
+
+function getAllowedOrigin(request, env) {
+  const origin =
+    request.headers.get("Origin");
+
+  const configured =
+    env.PUBLIC_ORIGIN ||
+    env.ALLOWED_ORIGIN ||
+    env.FRONTEND_ORIGIN ||
+    "";
+
+  if (!origin) {
+    return null;
+  }
+
+  if (configured === "*") {
+    // Wildcard cannot be used with credentials.
+    return null;
+  }
+
+  if (
+    configured &&
+    origin === configured
+  ) {
+    return origin;
+  }
+
+  return null;
+}
+
+
+function corsHeaders(request, env) {
+  const origin =
+    getAllowedOrigin(
+      request,
+      env
+    );
+
+  if (!origin) {
+    return {};
+  }
+
+  return {
+    "Access-Control-Allow-Origin":
+      origin,
+
+    "Access-Control-Allow-Credentials":
+      "true",
+
+    "Access-Control-Allow-Methods":
+      "GET, POST, OPTIONS",
+
+    "Access-Control-Allow-Headers":
+      "Content-Type",
+
+    "Vary":
+      "Origin"
+  };
+}
+
+
+function withCors(
+  response,
+  request,
+  env
+) {
+  const headers =
+    new Headers(
+      response.headers
+    );
+
+  const cors =
+    corsHeaders(
+      request,
+      env
+    );
+
+  for (
+    const [key, value]
+    of Object.entries(cors)
+  ) {
+    headers.set(
+      key,
+      value
+    );
+  }
+
+  return new Response(
+    response.body,
+    {
+      status:
+        response.status,
+
+      statusText:
+        response.statusText,
+
+      headers
+    }
+  );
+}
+
+
+// ============================================================
+// RESPONSE HELPERS
+// ============================================================
+
+function json(
+  data,
+  status = 200,
+  extraHeaders = {},
+  request = null,
+  env = null
+) {
+  const headers = {
+    "Content-Type":
+      "application/json; charset=UTF-8",
+
+    "Cache-Control":
+      "no-store",
+
+    ...extraHeaders
+  };
+
+  if (
+    request &&
+    env
+  ) {
+    Object.assign(
+      headers,
+      corsHeaders(
+        request,
+        env
+      )
+    );
+  }
+
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers
+    }
+  );
+}
+
+
+function error(
+  message,
+  status = 404
+) {
+  return json(
+    {
+      success: false,
+      message
+    },
+    status
+  );
+}
+
+
+// ============================================================
+// COOKIE HELPERS
+// ============================================================
+
+function getCookie(
+  request,
+  name
+) {
+  const cookieHeader =
+    request.headers.get(
+      "Cookie"
+    ) || "";
+
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const cookies =
+    cookieHeader.split(";");
+
+  for (
+    const part
+    of cookies
+  ) {
+    const index =
+      part.indexOf("=");
+
+    if (index === -1) {
+      continue;
+    }
+
+    const key =
+      part
+        .slice(
+          0,
+          index
+        )
+        .trim();
+
+    if (
+      key !== name
+    ) {
+      continue;
+    }
+
+    return decodeURIComponent(
+      part
+        .slice(
+          index + 1
+        )
+        .trim()
+    );
+  }
+
+  return null;
+}
+
+
+function isArticleAuthorized(
+  request
+) {
+  return (
+    getCookie(
+      request,
+      ARTICLE_COOKIE
+    ) === "granted"
+  );
+}
+
+
+// ============================================================
+// COOKIE RESPONSE
+// ============================================================
+
+function articleLoginCookie() {
+  return [
+    `${ARTICLE_COOKIE}=granted`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=None",
+    `Max-Age=${ARTICLE_SESSION_MAX_AGE}`
+  ].join("; ");
+}
+
+
+function articleLogoutCookie() {
+  return [
+    `${ARTICLE_COOKIE}=`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=None",
+    "Max-Age=0",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  ].join("; ");
+}
+
+
+// ============================================================
+// ARTICLE NORMALIZATION
+// ============================================================
+
+function getSlug(
+  article
+) {
+  return String(
+    article?.slug ||
+    article?.article ||
+    ""
+  ).trim();
+}
+
+
+function isDraft(
+  article
+) {
+  return Boolean(
+    article?.draft
+  );
+}
+
+
+function isProtected(
+  article
+) {
+  return Boolean(
+    article?.protected
+  );
+}
+
+
+function isPopular(
+  article
+) {
+  return Boolean(
+    article?.popular
+  );
+}
+
+
+// ============================================================
+// PUBLIC ARTICLE OBJECT
+//
+// The Drive JSON structure is preserved.
+//
+// markdown is removed from metadata responses because
+// /content and /raw provide the article body separately.
+// ============================================================
+
+function publicArticle(
+  article
+) {
+  if (!article) {
+    return null;
+  }
+
+  const {
+    markdown,
+    ...metadata
+  } = article;
+
+  const tags =
+    Array.isArray(article.tags)
+      ? article.tags
+      : typeof article.tags === "string"
+        ? article.tags
+            .split(",")
+            .map(tag => tag.trim())
+            .filter(Boolean)
+        : [];
+
+  return {
+    ...metadata,
+
+    article:
+      article.article ||
+      article.slug ||
+      "",
+
+    tags,
+
+    settings: {
+      showOriginal: false,
+      showRaw: false,
+      showCopy: true,
+      showShare: true,
+      originalUrl: "",
+      ...(article.settings || {})
+    }
+  };
+}
+
+
+// ============================================================
+// ARTICLE INDEX
+//
+// Existing provider:
+//
+// ARTICLE_CACHE KV
+//       ↓ miss
+// Google Drive
+//
+// No second article cache is created here.
+// ============================================================
+
+async function getAllArticles(
+  env
+) {
+  const result =
+    await listArticles(
+      env
+    );
+
+  const rows =
+    Array.isArray(
+      result?.rows
+    )
+      ? result.rows
+      : [];
+
+  return rows;
+}
+
+
+async function findArticle(
+  env,
+  slug
+) {
+  const cleanSlug =
+    String(
+      slug || ""
+    ).trim();
+
+  if (!cleanSlug) {
+    return null;
+  }
+
+  return getArticleBySlug(
+    env,
+    cleanSlug
+  );
+}
+
+
+// ============================================================
+// GET /articles
+//
+// Public articles only.
+// Draft articles are excluded.
+// ============================================================
+
+async function listPublicArticles(
+  request,
+  env
+) {
+  const articles =
+    await getAllArticles(
+      env
+    );
+
+  const publicArticles =
+    articles
+      .filter(
+        article =>
+          !isDraft(article)
+      )
+      .map(
+        publicArticle
+      );
+
+  return json(
+    {
+      success: true,
+
+      count:
+        publicArticles.length,
+
+      articles:
+        publicArticles
+    }
+  );
+}
+
+
+// ============================================================
+// GET /articles/popular
+//
+// Public articles only.
+// popular === true.
+// Maximum 3.
+// ============================================================
+
+async function listPopularArticles(
+  request,
+  env
+) {
+  const articles =
+    await getAllArticles(
+      env
+    );
+
+  const popular =
+    articles
+      .filter(
+        article =>
+          !isDraft(article) &&
+          isPopular(article)
+      )
+      .slice(
+        0,
+        3
+      )
+      .map(
+        publicArticle
+      );
+
+  return json(
+    {
+      success: true,
+
+      articles:
+        popular
+    }
+  );
+}
+
+
+// ============================================================
+// GET /articles/:slug
+//
+// Returns article metadata.
+// Draft articles are not publicly exposed.
+// ============================================================
+
+async function getArticleMetadata(
+  request,
+  env,
+  slug
+) {
+  const article =
+    await findArticle(
+      env,
+      slug
+    );
+
+  if (
+    !article ||
+    isDraft(article)
+  ) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  return json(
+    {
+      success: true,
+
+      article:
+        publicArticle(
+          article
+        )
+    }
+  );
+}
+
+
+// ============================================================
+// GET /articles/:slug/status
+//
+// {
+//   success: true,
+//   protected: boolean,
+//   authorized: boolean
+// }
+// ============================================================
+
+async function getArticleStatus(
+  request,
+  env,
+  slug
+) {
+  const article =
+    await findArticle(
+      env,
+      slug
+    );
+
+  if (
+    !article ||
+    isDraft(article)
+  ) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  return json(
+    {
+      success: true,
+
+      protected:
+        isProtected(
+          article
+        ),
+
+      authorized:
+        isArticleAuthorized(
+          request
+        )
+    }
+  );
+}
+
+
+// ============================================================
+// POST /articles/login
+//
+// Uses the SAME existing Cloudflare frontend article
+// password system.
+//
+// verifyFrontendPassword(
+//   env,
+//   "articles",
+//   password
+// )
+//
+// No new password storage.
+// ============================================================
+
+async function login(
+  request,
+  env
+) {
+  try {
+    let body;
+
+    try {
+      body =
+        await request.json();
+    } catch {
+      return error(
+        "Invalid JSON body",
+        400
+      );
+    }
+
+    const password =
+      typeof body?.password ===
+      "string"
+        ? body.password
+        : "";
+
+    if (!password) {
+      return error(
+        "Password is required",
+        400
+      );
+    }
+
+    const valid =
+      await verifyFrontendPassword(
+        env,
+        "articles",
+        password
+      );
+
+    if (!valid) {
+      return json(
+        {
+          success: false,
+          message:
+            "Wrong password"
+        },
+        401
+      );
+    }
+
+    return json(
+      {
+        success: true
+      },
+      200,
+      {
+        "Set-Cookie":
+          articleLoginCookie()
+      }
+    );
+
+  } catch (err) {
+    console.error(
+      "ARTICLE LOGIN ERROR:",
+      err
+    );
+
+    return json(
+      {
+        success: false,
+        message:
+          "Login failed"
+      },
+      500
+    );
+  }
+}
+
+
+// ============================================================
+// POST /articles/logout
+// ============================================================
+
+async function logout() {
+  return json(
+    {
+      success: true
+    },
+    200,
+    {
+      "Set-Cookie":
+        articleLogoutCookie()
+    }
+  );
+}
+
+
+// ============================================================
+// MARKDOWN → HTML
+//
+// Render-style pipeline:
+//
+// 1. Custom blocks
+// 2. Images
+// 3. Markdown → HTML
+// 4. Gallery blocks
+// 5. Cleanup
+//
+// Requires markdown-it in the Worker package.
+// ============================================================
+
+async function renderMarkdown(
+  markdown
+) {
+  const text =
+    typeof markdown ===
+    "string"
+      ? markdown
+      : "";
+
+  const module =
+    await import(
+      "markdown-it"
+    );
+
+  const MarkdownIt =
+    module.default ||
+    module;
+
+  const md =
+    new MarkdownIt(
+      {
+        html: true,
+        breaks: true,
+        linkify: true
+      }
+    );
+
+
+  // ----------------------------------------------------------
+  // CUSTOM BLOCKS
+  // ----------------------------------------------------------
+
+  // :::quote
+  // ...
+  // :::
+  let body =
+    text;
+
+  body =
+    body.replace(
+      /:::quote\s*\n([\s\S]*?)\n\s*:::/g,
+      (
+        _,
+        content
+      ) => {
+        return `
+<div class="md-quote">
+💬 ${content.trim()}
+</div>`;
+      }
+    );
+
+
+  // :::section
+  // ...
+  // :::
+  body =
+    body.replace(
+      /:::section\s*\n([\s\S]*?)\n\s*:::/g,
+      (
+        _,
+        content
+      ) => {
+        return `
+<div class="md-section">
+
+${content.trim()}
+
+</div>`;
+      }
+    );
+
+
+  // :::callout type="warning"
+  // ...
+  // :::
+  body =
+    body.replace(
+      /:::callout(?:\s+type="(.*?)")?\s*\n?([\s\S]*?)\n\s*:::/g,
+      (
+        _,
+        type = "info",
+        content
+      ) => {
+        const icons = {
+          info: "ℹ️",
+          warning: "⚠️",
+          success: "✅",
+          error: "❌"
+        };
+
+        return `
+<div class="md-callout ${type}">
+${icons[type] || "ℹ️"} ${content.trim()}
+</div>`;
+      }
+    );
+
+
+  // ----------------------------------------------------------
+  // IMAGE PREPROCESSOR
+  // ----------------------------------------------------------
+
+  body =
+    body.replace(
+      /!\[(.*?)\]\((.*?)\)/g,
+      (
+        _,
+        alt,
+        src
+      ) => {
+        return `<img src="${src}" alt="${alt}">`;
+      }
+    );
+
+
+  // ----------------------------------------------------------
+  // MARKDOWN → HTML
+  // ----------------------------------------------------------
+
+  let html =
+    md.render(
+      body
+    );
+
+
+  // ----------------------------------------------------------
+  // RESTORE GALLERY BLOCK
+  // ----------------------------------------------------------
+
+  html =
+    html.replace(
+      /<p>:::gallery<\/p>([\s\S]*?)<p>:::<\/p>/g,
+      (
+        _,
+        content
+      ) => {
+        return `
+<div class="article-image-grid">
+${content}
+</div>
+`;
+      }
+    );
+
+
+  // ----------------------------------------------------------
+  // CLEANUP
+  // ----------------------------------------------------------
+
+  html =
+    html
+      .replace(
+        /<p>\s*<\/p>/g,
+        ""
+      )
+      .replace(
+        /<hr>\s*<hr>/g,
+        "<hr>"
+      );
+
+  return html;
+}
+
+
+// ============================================================
+// GET /articles/:slug/content
+//
+// Returns rendered HTML.
+//
+// Protected article:
+//     no article_session → 401
+//
+// Public article:
+//     immediately available
+// ============================================================
+
+async function getArticleContent(
+  request,
+  env,
+  slug
+) {
+  const article =
+    await findArticle(
+      env,
+      slug
+    );
+
+  if (!article) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  if (
+    isDraft(article)
+  ) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  if (
+    isProtected(article) &&
+    !isArticleAuthorized(
+      request
+    )
+  ) {
+    return error(
+      "Unauthorized",
+      401
+    );
+  }
+
+  const markdown =
+    article.markdown;
+
+  if (
+    typeof markdown !==
+    "string"
+  ) {
+    return error(
+      "Markdown not found",
+      404
+    );
+  }
+
+  try {
+    const html =
+      await renderMarkdown(
+        markdown
+      );
+
+    return new Response(
+      html,
+      {
+        status: 200,
+
+        headers: {
+          "Content-Type":
+            "text/html; charset=UTF-8",
+
+          "Cache-Control":
+            "no-store"
+        }
+      }
+    );
+
+  } catch (err) {
+    console.error(
+      "ARTICLE MARKDOWN RENDER ERROR:",
+      err
+    );
+
+    return error(
+      "Unable to render article",
+      500
+    );
+  }
+}
+
+
+// ============================================================
+// GET /articles/:slug/raw
+//
+// Returns the original Markdown stored inside Drive JSON.
+//
+// Protected articles require article_session.
+// ============================================================
+
+async function getArticleRaw(
+  request,
+  env,
+  slug
+) {
+  const article =
+    await findArticle(
+      env,
+      slug
+    );
+
+  if (!article) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  if (
+    isDraft(article)
+  ) {
+    return error(
+      "Article not found",
+      404
+    );
+  }
+
+  if (
+    isProtected(article) &&
+    !isArticleAuthorized(
+      request
+    )
+  ) {
+    return error(
+      "Unauthorized",
+      401
+    );
+  }
+
+  const markdown =
+    article.markdown;
+
+  if (
+    typeof markdown !==
+    "string"
+  ) {
+    return error(
+      "Markdown not found",
+      404
+    );
+  }
+
+  return new Response(
+    markdown,
+    {
+      status: 200,
+
+      headers: {
+        "Content-Type":
+          "text/markdown; charset=UTF-8",
+
+        "Cache-Control":
+          "no-store"
+      }
+    }
+  );
+}
+
+
+// ============================================================
+// INTERNAL ROUTER
+// ============================================================
+
+async function articlesRouteInternal(
+  request,
+  env
+) {
+  const url =
+    new URL(
+      request.url
+    );
+
+  const pathname =
+    url.pathname;
+
+
+  // ==========================================================
+  // CORS PREFLIGHT
+  // ==========================================================
+
+  if (
+    request.method ===
+    "OPTIONS"
+  ) {
+    return new Response(
+      null,
+      {
+        status: 204,
+
+        headers: {
+          ...corsHeaders(
+            request,
+            env
+          ),
+
+          "Access-Control-Max-Age":
+            "86400"
+        }
+      }
+    );
+  }
+
+
+  // ==========================================================
+  // POST /articles/login
+  // ==========================================================
+
+  if (
+    request.method === "POST" &&
+    pathname ===
+      "/articles/login"
+  ) {
+    return login(
+      request,
+      env
+    );
+  }
+
+
+  // ==========================================================
+  // POST /articles/logout
+  // ==========================================================
+
+  if (
+    request.method === "POST" &&
+    pathname ===
+      "/articles/logout"
+  ) {
+    return logout();
+  }
+
+
+  // ==========================================================
+  // GET /articles
+  // ==========================================================
+
+  if (
+    request.method === "GET" &&
+    (
+      pathname ===
+        "/articles" ||
+      pathname ===
+        "/articles/"
+    )
+  ) {
+    return listPublicArticles(
+      request,
+      env
+    );
+  }
+
+
+  // ==========================================================
+  // GET /articles/popular
+  //
+  // MUST be checked before /articles/:slug.
+  // ==========================================================
+
+  if (
+    request.method === "GET" &&
+    pathname ===
+      "/articles/popular"
+  ) {
+    return listPopularArticles(
+      request,
+      env
+    );
+  }
+
+
+  // ==========================================================
+  // Everything below requires a slug.
+  // ==========================================================
+
+  if (
+    !pathname.startsWith(
+      "/articles/"
+    )
+  ) {
+    return null;
+  }
+
+
+  const remainder =
+    pathname.slice(
+      "/articles/".length
+    );
+
+
+  if (!remainder) {
+    return listPublicArticles(
+      request,
+      env
+    );
+  }
+
+
+  // ==========================================================
+  // /articles/:slug/content
+  // ==========================================================
+
+  if (
+    request.method === "GET" &&
+    remainder.endsWith(
+      "/content"
+    )
+  ) {
+    const slug =
+      remainder.slice(
+        0,
+        -"/content".length
+      );
+
+    if (!slug) {
+      return error(
+        "Article slug is required",
+        400
+      );
+    }
+
+    return getArticleContent(
+      request,
+      env,
+      decodeURIComponent(
+        slug
+      )
+    );
+  }
+
+
+  // ==========================================================
+  // /articles/:slug/raw
+  // ==========================================================
+
+  if (
+    request.method === "GET" &&
+    remainder.endsWith(
+      "/raw"
+    )
+  ) {
+    const slug =
+      remainder.slice(
+        0,
+        -"/raw".length
+      );
+
+    if (!slug) {
+      return error(
+        "Article slug is required",
+        400
+      );
+    }
+
+    return getArticleRaw(
+      request,
+      env,
+      decodeURIComponent(
+        slug
+      )
+    );
+  }
+
+
+  // ==========================================================
+  // /articles/:slug/status
+  // ==========================================================
+
+  if (
+    request.method === "GET" &&
+    remainder.endsWith(
+      "/status"
+    )
+  ) {
+    const slug =
+      remainder.slice(
+        0,
+        -"/status".length
+      );
+
+    if (!slug) {
+      return error(
+        "Article slug is required",
+        400
+      );
+    }
+
+    return getArticleStatus(
+      request,
+      env,
+      decodeURIComponent(
+        slug
+      )
+    );
+  }
+
+
+  // ==========================================================
+  // /articles/:slug
+  // ==========================================================
+
+  if (
+    request.method === "GET"
+  ) {
+    return getArticleMetadata(
+      request,
+      env,
+      decodeURIComponent(
+        remainder
+      )
+    );
+  }
+
+
+  return error(
+    "Method not allowed",
+    405
+  );
+}
+
+
+// ============================================================
+// EXPORTED ROUTER
+//
+// The wrapper adds CORS to every response, including:
+// - normal JSON responses
+// - login Set-Cookie responses
+// - logout responses
+// - HTML responses
+// - raw Markdown responses
+// - errors
+// ============================================================
+
+export async function articlesRoute(
+  request,
+  env
+) {
+  const response =
+    await articlesRouteInternal(
+      request,
+      env
+    );
+
+  if (!response) {
+    return null;
+  }
+
+  return withCors(
+    response,
+    request,
+    env
+  );
+}

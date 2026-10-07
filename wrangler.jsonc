@@ -1,5 +1,20 @@
 {
-  "name": "gallery-worker",
-  "main": "src/index.js",
-  "compatibility_date": "2026-09-25"
+	"name": "gallery-worker",
+	"main": "src/index.js",
+	"compatibility_date": "2026-09-25",
+	"assets": {
+		"directory": "./public"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "GALLERY_CACHE",
+			"id": "e54aec761c204e6db21f228696629b12",
+			"remote": true
+		},
+		{
+			"binding": "ARTICLE_CACHE",
+			"id": "70725628ee604f77b7b78146eb803569",
+			"remote": true
+		}
+	]
 }
