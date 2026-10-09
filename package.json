@@ -12,7 +12,6 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.0.0",
-    "@cloudflare/workerd-linux-arm64": "^1.20261006.1",
     "@rolldown/binding-wasm32-wasi": "^1.2.13",
     "vitest": "~4.1.0",
     "wrangler": "^4"
