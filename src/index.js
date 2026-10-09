@@ -4,6 +4,9 @@
 
 import { requireAdmin } from "./auth/authMiddleware.js";
 import { requireImageAuth } from "./auth/imageAuth.js";
+import {
+    authenticateFrontend
+} from "./auth/frontendAuth.js";
 
 
 import { adminRoute } from "./routes/admin.js";
@@ -40,14 +43,64 @@ function jsonError(message, status = 404) {
 
 
 
+// =========================================================
+// CENTRALIZED CORS — Render-style allowlist
+// =========================================================
+
+function getAllowedOrigins(env) {
+  return [
+    "https://manish8090.dpdns.org",
+    "https://manish8090.pages.dev",
+    "https://gallery-worker.manish8090101.workers.dev",
+    "https://api.manish8090.dpdns.org",
+
+    env.RENDER_EXTERNAL_URL,
+
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8788",
+    "http://127.0.0.1:8080"
+  ].filter(Boolean);
+}
+
+function applyCors(request, response, env) {
+  const origin = request.headers.get("Origin");
+  const allowedOrigins = getAllowedOrigins(env);
+
+  const headers = new Headers(response.headers);
+
+  if (origin && allowedOrigins.includes(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set(
+      "Access-Control-Allow-Methods",
+      "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    headers.set(
+      "Access-Control-Allow-Headers",
+      request.headers.get("Access-Control-Request-Headers") ||
+        "Content-Type, Authorization"
+    );
+    headers.append("Vary", "Origin");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+
+
 
 // =========================================================
 // WORKER
 // =========================================================
 
-export default {
-
-  async fetch(request, env, ctx) {
+async function handleRequest(request, env, ctx) {
 
     const url = new URL(request.url);
 
@@ -306,11 +359,31 @@ if (
 // Must come before the general /auth/ route.
 // -------------------------------------------------------
 
+// -------------------------------------------------------
+// FRONTEND AUTH
+// Supports both Render-compatible and Worker paths.
+// -------------------------------------------------------
+
 if (
-    pathname.startsWith("/auth/frontend/")
+    pathname.startsWith("/auth/frontend/") ||
+    pathname === "/frontend/login" ||
+    pathname === "/frontend/check" ||
+    pathname === "/frontend/logout"
 ) {
+    const authPath = pathname.startsWith("/frontend/")
+        ? pathname.replace(
+            "/frontend/",
+            "/auth/frontend/"
+        )
+        : pathname;
+
+    const authRequest = new Request(
+        new URL(authPath, request.url),
+        request
+    );
+
     return frontendAuthRoute(
-        request,
+        authRequest,
         env
     );
 }
@@ -371,27 +444,45 @@ if (
       // GALLERY
       // =======================================================
 
-      if (
-        pathname === "/gallery" ||
-        pathname.startsWith("/gallery/")
-      ) {
+// =======================================================
+// GALLERY
+// =======================================================
 
-        const authResponse =
-          await requireAdmin(
-            request,
-            env
-          );
+if (
+    pathname === "/gallery" ||
+    pathname.startsWith("/gallery/")
+) {
+    // First, allow an existing admin session.
+    const adminAuth = await requireAdmin(
+        request,
+        env
+    );
 
-        if (!authResponse.authenticated) {
-  return authResponse.response;
-}
-
+    if (adminAuth.authenticated) {
         return galleryRoute(
-          request,
-          env,
-          ctx
+            request,
+            env,
+            ctx
         );
-      }
+    }
+
+    // Otherwise, require the gallery frontend account.
+    const frontendAuth = await authenticateFrontend(
+        request,
+        env,
+        "gallery"
+    );
+
+    if (!frontendAuth.authenticated) {
+        return adminAuth.response;
+    }
+
+    return galleryRoute(
+        request,
+        env,
+        ctx
+    );
+}
 
 
       // =======================================================
@@ -710,6 +801,32 @@ if (
 
     }
 
-  }
+}
 
-};
+    export default {
+      async fetch(request, env, ctx) {
+        const origin = request.headers.get("Origin");
+        const allowedOrigins = getAllowedOrigins(env);
+
+        // Centralized preflight handling.
+        if (request.method === "OPTIONS") {
+          if (!origin || !allowedOrigins.includes(origin)) {
+            return new Response(null, { status: 403 });
+          }
+
+          return applyCors(
+            request,
+            new Response(null, { status: 204 }),
+            env
+          );
+        }
+
+        const response = await handleRequest(
+          request,
+          env,
+          ctx
+        );
+
+        return applyCors(request, response, env);
+      }
+    };

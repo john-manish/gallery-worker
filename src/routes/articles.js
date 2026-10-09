@@ -39,123 +39,6 @@ const ARTICLE_SESSION_MAX_AGE =
   60 * 60 * 24 * 30;
 
 
-// ============================================================
-// CORS
-// ============================================================
-//
-// Recommended Worker environment variable:
-//
-// PUBLIC_ORIGIN=https://your-public-site.com
-//
-// Fallbacks:
-// ALLOWED_ORIGIN
-// FRONTEND_ORIGIN
-//
-// Credentials are enabled because article_session is
-// stored in a cookie.
-//
-// Never use "*" with credentials.
-// ============================================================
-
-function getAllowedOrigin(request, env) {
-  const origin =
-    request.headers.get("Origin");
-
-  const configured =
-    env.PUBLIC_ORIGIN ||
-    env.ALLOWED_ORIGIN ||
-    env.FRONTEND_ORIGIN ||
-    "";
-
-  if (!origin) {
-    return null;
-  }
-
-  if (configured === "*") {
-    // Wildcard cannot be used with credentials.
-    return null;
-  }
-
-  if (
-    configured &&
-    origin === configured
-  ) {
-    return origin;
-  }
-
-  return null;
-}
-
-
-function corsHeaders(request, env) {
-  const origin =
-    getAllowedOrigin(
-      request,
-      env
-    );
-
-  if (!origin) {
-    return {};
-  }
-
-  return {
-    "Access-Control-Allow-Origin":
-      origin,
-
-    "Access-Control-Allow-Credentials":
-      "true",
-
-    "Access-Control-Allow-Methods":
-      "GET, POST, OPTIONS",
-
-    "Access-Control-Allow-Headers":
-      "Content-Type",
-
-    "Vary":
-      "Origin"
-  };
-}
-
-
-function withCors(
-  response,
-  request,
-  env
-) {
-  const headers =
-    new Headers(
-      response.headers
-    );
-
-  const cors =
-    corsHeaders(
-      request,
-      env
-    );
-
-  for (
-    const [key, value]
-    of Object.entries(cors)
-  ) {
-    headers.set(
-      key,
-      value
-    );
-  }
-
-  return new Response(
-    response.body,
-    {
-      status:
-        response.status,
-
-      statusText:
-        response.statusText,
-
-      headers
-    }
-  );
-}
 
 
 // ============================================================
@@ -165,9 +48,7 @@ function withCors(
 function json(
   data,
   status = 200,
-  extraHeaders = {},
-  request = null,
-  env = null
+  extraHeaders = {}
 ) {
   const headers = {
     "Content-Type":
@@ -179,18 +60,7 @@ function json(
     ...extraHeaders
   };
 
-  if (
-    request &&
-    env
-  ) {
-    Object.assign(
-      headers,
-      corsHeaders(
-        request,
-        env
-      )
-    );
-  }
+  
 
   return new Response(
     JSON.stringify(data),
@@ -1116,31 +986,8 @@ async function articlesRouteInternal(
     url.pathname;
 
 
-  // ==========================================================
-  // CORS PREFLIGHT
-  // ==========================================================
 
-  if (
-    request.method ===
-    "OPTIONS"
-  ) {
-    return new Response(
-      null,
-      {
-        status: 204,
 
-        headers: {
-          ...corsHeaders(
-            request,
-            env
-          ),
-
-          "Access-Control-Max-Age":
-            "86400"
-        }
-      }
-    );
-  }
 
 
   // ==========================================================
@@ -1372,23 +1219,6 @@ async function articlesRouteInternal(
 // - errors
 // ============================================================
 
-export async function articlesRoute(
-  request,
-  env
-) {
-  const response =
-    await articlesRouteInternal(
-      request,
-      env
-    );
-
-  if (!response) {
-    return null;
-  }
-
-  return withCors(
-    response,
-    request,
-    env
-  );
+export async function articlesRoute(request, env) {
+  return articlesRouteInternal(request, env);
 }

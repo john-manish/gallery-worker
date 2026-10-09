@@ -28,7 +28,8 @@ const FRONTEND_COOKIE =
 
 export async function authenticateFrontend(
     request,
-    env
+    env,
+    expectedFrontend = null
 ) {
 
     const token =
@@ -75,6 +76,21 @@ export async function authenticateFrontend(
                 authenticated: false
             };
         }
+
+
+// -------------------------------------------------
+// Validate frontend account type
+// -------------------------------------------------
+
+if (
+    expectedFrontend &&
+    decoded.frontend !== expectedFrontend
+) {
+    return {
+        authenticated: false
+    };
+}
+
 
 
         // -------------------------------------------------
