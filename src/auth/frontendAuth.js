@@ -18,8 +18,10 @@ import {
 // COOKIE
 // =========================================================
 
-const FRONTEND_COOKIE =
-    "frontend_token";
+const FRONTEND_COOKIES = {
+    gallery: "gallery_frontend_token",
+    articles: "articles_frontend_token"
+};
 
 
 // =========================================================
@@ -32,11 +34,20 @@ export async function authenticateFrontend(
     expectedFrontend = null
 ) {
 
-    const token =
-        getCookie(
-            request,
-            FRONTEND_COOKIE
-        );
+    const cookieName =
+    FRONTEND_COOKIES[expectedFrontend];
+
+    if (!cookieName) {
+    return {
+    authenticated: false,
+    message: "Invalid frontend type"
+    };
+    }
+
+    const token = getCookie(
+    request,
+    cookieName
+    );
 
 
     // -----------------------------------------------------

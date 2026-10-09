@@ -364,6 +364,7 @@ if (
 // Supports both Render-compatible and Worker paths.
 // -------------------------------------------------------
 
+
 if (
     pathname.startsWith("/auth/frontend/") ||
     pathname === "/frontend/login" ||
@@ -377,8 +378,12 @@ if (
         )
         : pathname;
 
+    // Preserve the original query parameters during rewriting.
+    const authUrl = new URL(authPath, request.url);
+    authUrl.search = url.search;
+
     const authRequest = new Request(
-        new URL(authPath, request.url),
+        authUrl,
         request
     );
 
@@ -387,6 +392,7 @@ if (
         env
     );
 }
+
 
 
 // -------------------------------------------------------

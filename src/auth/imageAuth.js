@@ -149,24 +149,23 @@ export async function authenticateImage(
     }
 
 
+
     // -----------------------------------------------------
-    // 2. Try frontend authentication
+    // 2. Try Gallery frontend authentication
     // -----------------------------------------------------
 
     const frontend =
         await authenticateFrontend(
             request,
-            env
+            env,
+            "gallery"
         );
-
 
     if (
         frontend &&
         frontend.authenticated
     ) {
-
         return {
-
             authenticated: true,
 
             user: {
@@ -183,6 +182,7 @@ export async function authenticateImage(
             token: frontend.token
         };
     }
+
 
 
     // -----------------------------------------------------

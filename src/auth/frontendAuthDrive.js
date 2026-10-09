@@ -831,32 +831,80 @@ export async function updateFrontendPassword(
 // VERIFY FRONTEND PASSWORD
 // =========================================================
 
+
 export async function verifyFrontendPassword(
     env,
     type,
     password
 ) {
-
-    const data =
-        await loadFrontendAuth(
-            env
-        );
-
-    if (!data[type]) {
-        return false;
-    }
-
     if (
-        data[type].enabled === false
+        type !== "gallery" &&
+        type !== "articles"
     ) {
         return false;
     }
 
-    return bcrypt.compare(
-        password,
-        data[type].passwordHash
-    );
+    if (typeof password !== "string" || !password) {
+        return false;
+    }
+
+    try {
+        const data = await loadFrontendAuth(env);
+        const account = data?.[type];
+
+        if (
+            !account ||
+            account.enabled === false
+        ) {
+            return false;
+        }
+
+        const passwordHash = account.passwordHash;
+
+        // Prefer bcrypt whenever a valid bcrypt hash exists.
+        if (
+            typeof passwordHash === "string" &&
+            /^\$2[aby]\$\d{2}\$/.test(passwordHash)
+        ) {
+            return await bcrypt.compare(
+                password,
+                passwordHash
+            );
+        }
+
+        // Legacy compatibility: use the encrypted password
+        // only when a usable bcrypt hash is unavailable.
+        if (
+            typeof account.encryptedPassword === "string" &&
+            account.encryptedPassword.length > 0
+        ) {
+            const storedPassword = await decryptPassword(
+                account.encryptedPassword,
+                env
+            );
+
+            return (
+                typeof storedPassword === "string" &&
+                storedPassword === password
+            );
+        }
+
+        // No usable password credential is stored.
+        console.warn(
+            `Frontend account "${type}" has no usable password credential.`
+        );
+
+        return false;
+    } catch (error) {
+        console.error(
+            `Frontend password verification failed for "${type}":`,
+            error?.message || error
+        );
+
+        return false;
+    }
 }
+
 
 
 // =========================================================
