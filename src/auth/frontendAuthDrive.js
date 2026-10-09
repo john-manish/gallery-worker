@@ -832,6 +832,7 @@ export async function updateFrontendPassword(
 // =========================================================
 
 
+
 export async function verifyFrontendPassword(
     env,
     type,
@@ -852,16 +853,36 @@ export async function verifyFrontendPassword(
         const data = await loadFrontendAuth(env);
         const account = data?.[type];
 
-        if (
-            !account ||
-            account.enabled === false
-        ) {
+        if (!account || account.enabled === false) {
             return false;
         }
 
+        const encryptedPassword = account.encryptedPassword;
+
+        // Preferred path: decrypt the existing AES-GCM
+        // credential and compare without expensive bcrypt.
+        if (
+            encryptedPassword &&
+            typeof encryptedPassword === "object" &&
+            typeof encryptedPassword.iv === "string" &&
+            typeof encryptedPassword.content === "string" &&
+            typeof encryptedPassword.tag === "string"
+        ) {
+            const storedPassword = await decryptPassword(
+                encryptedPassword,
+                env
+            );
+
+            return (
+                typeof storedPassword === "string" &&
+                storedPassword === password
+            );
+        }
+
+        // Compatibility path for accounts that only have
+        // a valid bcrypt hash.
         const passwordHash = account.passwordHash;
 
-        // Prefer bcrypt whenever a valid bcrypt hash exists.
         if (
             typeof passwordHash === "string" &&
             /^\$2[aby]\$\d{2}\$/.test(passwordHash)
@@ -872,24 +893,6 @@ export async function verifyFrontendPassword(
             );
         }
 
-        // Legacy compatibility: use the encrypted password
-        // only when a usable bcrypt hash is unavailable.
-        if (
-            typeof account.encryptedPassword === "string" &&
-            account.encryptedPassword.length > 0
-        ) {
-            const storedPassword = await decryptPassword(
-                account.encryptedPassword,
-                env
-            );
-
-            return (
-                typeof storedPassword === "string" &&
-                storedPassword === password
-            );
-        }
-
-        // No usable password credential is stored.
         console.warn(
             `Frontend account "${type}" has no usable password credential.`
         );
@@ -904,6 +907,7 @@ export async function verifyFrontendPassword(
         return false;
     }
 }
+
 
 
 

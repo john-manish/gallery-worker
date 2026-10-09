@@ -236,9 +236,39 @@ function isPopular(
 // /content and /raw provide the article body separately.
 // ============================================================
 
-function publicArticle(
-  article
-) {
+
+
+function formatArticleDate(date) {
+  if (!date) return "";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function estimateArticleReadTime(markdown) {
+  const words = String(markdown || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+
+  return `${Math.max(1, Math.ceil(words / 200))} min read`;
+}
+
+
+
+
+
+function publicArticle(article) {
   if (!article) {
     return null;
   }
@@ -258,6 +288,11 @@ function publicArticle(
             .filter(Boolean)
         : [];
 
+  const date =
+    article.date ||
+    article.created_at ||
+    "";
+
   return {
     ...metadata,
 
@@ -265,6 +300,16 @@ function publicArticle(
       article.article ||
       article.slug ||
       "",
+
+    date,
+
+    displayDate:
+      article.displayDate ||
+      formatArticleDate(date),
+
+    readTime:
+      article.readTime ||
+      estimateArticleReadTime(markdown),
 
     tags,
 
@@ -278,6 +323,7 @@ function publicArticle(
     }
   };
 }
+
 
 
 // ============================================================
