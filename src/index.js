@@ -411,6 +411,109 @@ if (
 
 
 
+
+
+      // =======================================================
+      // INTERNAL ARTICLE CACHE INVALIDATION
+      // =======================================================
+
+      if (pathname === "/internal/cache/invalidate") {
+        if (request.method !== "POST") {
+          return jsonError("Method not allowed", 405);
+        }
+
+        const secret = env.INTERNAL_CACHE_SECRET;
+        const authorization =
+          request.headers.get("Authorization") || "";
+
+        if (
+          typeof secret !== "string" ||
+          !secret ||
+          authorization !== `Bearer ${secret}`
+        ) {
+          return jsonError("Unauthorized", 401);
+        }
+
+        if (!env.ARTICLE_CACHE) {
+          return jsonError(
+            "ARTICLE_CACHE binding is missing",
+            500
+          );
+        }
+
+        let payload;
+
+        try {
+          payload = await request.json();
+        } catch {
+          return jsonError(
+            "Request body must be valid JSON",
+            400
+          );
+        }
+
+        if (
+          !payload ||
+          typeof payload !== "object" ||
+          !Array.isArray(payload.slugs) ||
+          payload.slugs.length > 100
+        ) {
+          return jsonError(
+            "Expected a slugs array with at most 100 entries",
+            400
+          );
+        }
+
+        const slugs = [...new Set(payload.slugs)];
+
+        // Only allow normal article slug characters.
+        if (
+          slugs.some(
+            (slug) =>
+              typeof slug !== "string" ||
+              slug.length < 1 ||
+              slug.length > 200 ||
+              !/^[a-z0-9][a-z0-9._~-]*$/i.test(slug)
+          )
+        ) {
+          return jsonError(
+            "One or more article slugs are invalid",
+            400
+          );
+        }
+
+        try {
+          await Promise.all(
+            slugs.map((slug) =>
+              env.ARTICLE_CACHE.delete(`article:${slug}`)
+            )
+          );
+
+          // Invalidate the cached article list too.
+          await env.ARTICLE_CACHE.delete("articles:index");
+
+          return Response.json({
+            ok: true,
+            invalidated: slugs.length,
+            indexInvalidated: true
+          });
+        } catch (error) {
+          console.error(
+            "Article cache invalidation failed:",
+            error
+          );
+
+          return jsonError(
+            "Failed to invalidate article cache",
+            500
+          );
+        }
+      }
+
+
+
+
+
 // =======================================================
 // PUBLIC ARTICLES
 // =======================================================

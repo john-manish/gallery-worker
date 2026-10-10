@@ -65,7 +65,8 @@ export async function setCachedArticle(env, article) {
 
   await env.ARTICLE_CACHE.put(
     articleKey(slug),
-    JSON.stringify(article)
+    JSON.stringify(article),
+    { expirationTtl: 60 }
   );
 
   return article;
@@ -128,7 +129,8 @@ export async function setCachedArticleIndex(env, articles) {
 
   await env.ARTICLE_CACHE.put(
     INDEX_KEY,
-    JSON.stringify(articles)
+    JSON.stringify(articles),
+    { expirationTtl: 60 }
   );
 
   return articles;
