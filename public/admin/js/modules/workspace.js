@@ -2292,25 +2292,33 @@ function flashSaved(
 
 
 
-function bindFrontendManagement(){
 
+function bindFrontendManagement() {
 
     bindButton(
         "galleryFrontendPasswordBtn",
-        ()=>{
+        () => {
             openFrontendPasswordModal("gallery");
         }
     );
 
-
     bindButton(
         "articlesFrontendPasswordBtn",
-        ()=>{
+        () => {
             openFrontendPasswordModal("articles");
         }
     );
 
+    // Admin account password
+    bindButton(
+        "adminFrontendPasswordBtn",
+        () => {
+            openFrontendPasswordModal("admin");
+        }
+    );
+
 }
+
 
 
 
@@ -2429,137 +2437,116 @@ async function changeFrontendPassword(
 
 
 
-async function loadFrontendAccounts(){
 
-    try{
+async function loadFrontendAccounts() {
+    try {
+        const data = await api("/admin/frontend/accounts");
 
-        const data =
-            await api(
-                "/admin/frontend/accounts"
-            );
+        if (!data) return;
 
+        const accounts = [
+            {
+                type: "admin",
+                account: data.admin || {},
+                statusId: "adminFrontendStatus",
+                updatedId: "adminFrontendUpdated",
+                passwordId: "adminFrontendPassword",
+                buttonId: "adminFrontendPasswordBtn",
+                eyeId: "adminPasswordEye"
+            },
+            {
+                type: "gallery",
+                account: data.gallery || {},
+                statusId: "galleryFrontendStatus",
+                updatedId: "galleryFrontendUpdated",
+                passwordId: "galleryFrontendPassword",
+                buttonId: "galleryFrontendPasswordBtn",
+                eyeId: "galleryPasswordEye"
+            },
+            {
+                type: "articles",
+                account: data.articles || {},
+                statusId: "articlesFrontendStatus",
+                updatedId: "articlesFrontendUpdated",
+                passwordId: "articlesFrontendPassword",
+                buttonId: "articlesFrontendPasswordBtn",
+                eyeId: "articlesPasswordEye"
+            }
+        ];
 
-        if(!data)
-            return;
+        accounts.forEach((item) => {
+            const {
+                account,
+                statusId,
+                updatedId,
+                passwordId,
+                buttonId,
+                eyeId
+            } = item;
 
+            // Account status
+            const status = document.getElementById(statusId);
 
-        const gallery =
-            data.gallery || {};
+            if (status) {
+                status.textContent = account.enabled
+                    ? "● Enabled"
+                    : "● Disabled";
 
+                status.classList.toggle(
+                    "disabled",
+                    !account.enabled
+                );
+            }
 
-        const articles =
-            data.articles || {};
+            // Last updated
+            const updated = document.getElementById(updatedId);
 
-
-
-        /*
-            Gallery
-        */
-
-        const galleryUpdated =
-            document.getElementById(
-                "galleryFrontendUpdated"
-            );
-
-
-        if(galleryUpdated){
-
-            galleryUpdated.textContent =
-                `Last updated: ${
-                    gallery.updatedAt
-                        ? formatDateTime(gallery.updatedAt)
+            if (updated) {
+                updated.textContent = `Last updated: ${
+                    account.updatedAt
+                        ? formatDateTime(account.updatedAt)
                         : "Never"
                 }`;
+            }
 
-        }
+            // Password display
+            const password = document.getElementById(passwordId);
 
+            if (password) {
+                password.type = "password";
+                password.value = "";
+                password.textContent = "••••••••";
+                password.dataset.visible = "false";
+                password.placeholder = account.hasPassword
+                    ? "••••••••"
+                    : "Not set";
+            }
 
+            // Set Password / Change Password button
+            const button = document.getElementById(buttonId);
 
-        const galleryStatus =
-            document.getElementById(
-                "galleryFrontendStatus"
-            );
+            if (button) {
+                button.textContent = account.hasPassword
+                    ? "Change Password"
+                    : "Set Password";
+            }
 
+            // Reset eye button
+            const eye = document.getElementById(eyeId);
 
-        if(galleryStatus){
-
-            galleryStatus.textContent =
-                gallery.enabled
-                ? "● Enabled"
-                : "● Disabled";
-
-
-            galleryStatus.classList.toggle(
-                "disabled",
-                !gallery.enabled
-            );
-
-        }
-
-
-
-
-        /*
-            Articles
-        */
-
-        const articlesUpdated =
-            document.getElementById(
-                "articlesFrontendUpdated"
-            );
-
-
-        if(articlesUpdated){
-
-            articlesUpdated.textContent =
-                `Last updated: ${
-                    articles.updatedAt
-                        ? formatDateTime(articles.updatedAt)
-                        : "Never"
-                }`;
-
-        }
-
-
-
-        const articlesStatus =
-            document.getElementById(
-                "articlesFrontendStatus"
-            );
-
-
-        if(articlesStatus){
-
-            articlesStatus.textContent =
-                articles.enabled
-                ? "● Enabled"
-                : "● Disabled";
-
-
-            articlesStatus.classList.toggle(
-                "disabled",
-                !articles.enabled
-            );
-
-        }
-
-
-
-    }
-    catch(err){
-
-        console.error(
-            "Frontend accounts load failed:",
-            err
-        );
+            if (eye) {
+                eye.textContent = "👁";
+                eye.disabled = !account.hasPassword;
+            }
+        });
+    } catch (err) {
+        console.error("Frontend accounts load failed:", err);
 
         toast(
             "Unable to load frontend accounts",
             "error"
         );
-
     }
-
 }
 
 
@@ -2567,113 +2554,75 @@ async function loadFrontendAccounts(){
 
 
 
-function bindFrontendPasswordEyes(){
 
+
+function bindFrontendPasswordEyes() {
     const buttons = [
-        ["galleryPasswordEye","galleryFrontendPassword","gallery"],
-        ["articlesPasswordEye","articlesFrontendPassword","articles"]
+        {
+            buttonId: "adminPasswordEye",
+            accountType: "admin",
+            passwordInputId: "adminFrontendPassword"
+        },
+        {
+            buttonId: "galleryPasswordEye",
+            accountType: "gallery",
+            passwordInputId: "galleryFrontendPassword"
+        },
+        {
+            buttonId: "articlesPasswordEye",
+            accountType: "articles",
+            passwordInputId: "articlesFrontendPassword"
+        }
     ];
 
+    buttons.forEach((item) => {
+        const {
+            buttonId,
+            accountType,
+            passwordInputId
+        } = item;
 
-    buttons.forEach(
-        ([btnId,inputId,type])=>{
+        const btn = document.getElementById(buttonId);
+        const pass = document.getElementById(passwordInputId);
 
+        if (!btn || !pass) return;
 
-        const btn =
-            document.getElementById(btnId);
-
-
-        const pass =
-            document.getElementById(inputId);
-
-
-        if(!btn || !pass)
-            return;
-
-
-
-        btn.onclick = async()=>{
-
-
-            try{
-
-
-                // hide again
-                if(pass.dataset.visible === "true"){
-
-
-                    pass.textContent =
-                        "••••••••";
-
-
-                    pass.dataset.visible =
-                        "false";
-
-
-                    btn.textContent =
-                        "👁";
-
-
+        btn.onclick = async () => {
+            try {
+                // Hide the password again
+                if (pass.dataset.visible === "true") {
+                    pass.value = "";
+                    pass.textContent = "••••••••";
+                    pass.dataset.visible = "false";
+                    btn.textContent = "👁";
+                    pass.type = "password";
                     return;
-
                 }
 
-
-
-                const data =
-                    await api(
-                        `/admin/frontend/${type}/password`
-                    );
-
-
-
-                if(
-                    !data.success
-                ){
-
-                    throw new Error(
-                        data.message ||
-                        "Unable to reveal password"
-                    );
-
-                }
-
-
-
-                pass.textContent =
-                    data.password;
-
-
-
-                pass.dataset.visible =
-                    "true";
-
-
-                btn.textContent =
-                    "🙈";
-
-
-            }
-            catch(err){
-
-
-                console.error(
-                    "Password reveal failed",
-                    err
+                const data = await api(
+                    `/admin/frontend/${accountType}/password`
                 );
 
+                if (!data || !data.success) {
+                    throw new Error(
+                        data?.message || "Unable to reveal password"
+                    );
+                }
+
+                // Show the returned password
+                pass.type = "text";
+                pass.value = data.password ?? "";
+                pass.textContent = data.password ?? "";
+                pass.dataset.visible = "true";
+                btn.textContent = "🙈";
+            } catch (err) {
+                console.error("Password reveal failed:", err);
 
                 toast(
                     "Unable to reveal password",
                     "error"
                 );
-
             }
-
-
         };
-
-
     });
-
 }

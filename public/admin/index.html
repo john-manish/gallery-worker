@@ -3235,6 +3235,66 @@ Separate frontend credential management page -->
                                 <article class="frontend-account-card card">
                                     <div class="frontend-account-header">
                                         <div
+                                            class="frontend-account-icon admin"
+                                        >
+                                            <i class="bi bi-shield-lock-fill"></i>
+                                        </div>
+                                        <div class="frontend-account-heading">
+                                            <h3>Admin Account</h3>
+                                            <p>Full access: Gallery, Articles, Dashboard</p>
+                                        </div>
+                                        <span
+                                            id="adminFrontendStatus"
+                                            class="frontend-account-status"
+                                        >● Disabled</span>
+                                    </div>
+
+                                    <div class="frontend-account-details">
+                                        <div class="setting-row">
+                                            <span>Username</span>
+                                            <strong>admin</strong>
+                                        </div>
+
+                                        <div class="setting-row">
+                                            <span>Password</span>
+                                            <div class="frontend-password-view">
+                                                <strong
+                                                    class="frontend-password-mask"
+                                                    id="adminFrontendPassword"
+                                                >
+                                                    ••••••••
+                                                </strong>
+                                                <button
+                                                    class="btn btn-icon password-eye-btn"
+                                                    id="adminPasswordEye"
+                                                    type="button"
+                                                    title="Show password"
+                                                >
+                                                    👁
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="frontend-account-meta"
+                                        id="adminFrontendUpdated"
+                                    >
+                                        Last updated: Never
+                                    </div>
+
+                                    <button
+                                        class="workspace-btn frontend-change-password"
+                                        id="adminFrontendPasswordBtn"
+                                        type="button"
+                                    >
+                                        🔑 Change Password
+                                    </button>
+                                </article>
+
+                                <article class="frontend-account-card card">
+                                    <div class="frontend-account-header">
+                                        <div
                                             class="frontend-account-icon gallery"
                                         >
                                             <i class="bi bi-images"></i>

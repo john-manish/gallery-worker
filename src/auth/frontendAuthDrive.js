@@ -468,49 +468,171 @@ async function writeKVFrontendAuth(
 // DEFAULT STRUCTURE
 // =========================================================
 
-function createDefaultFrontendAuth() {
+const FRONTEND_ACCOUNT_TYPES = Object.freeze([
+    "admin",
+    "gallery",
+    "articles"
+]);
 
-    const now =
-        new Date().toISOString();
+const FRONTEND_PERMISSION_SET = Object.freeze([
+    "gallery",
+    "articles",
+    "dashboard"
+]);
+
+const DEFAULT_FRONTEND_ACCOUNT_CONFIG = Object.freeze({
+    admin: {
+        username: "admin",
+        permissions: ["gallery", "articles", "dashboard"],
+        // Admin remains disabled until an explicit password is configured.
+        enabled: false
+    },
+    gallery: {
+        username: "gallery",
+        permissions: ["gallery"],
+        enabled: true
+    },
+    articles: {
+        username: "articles",
+        permissions: ["articles"],
+        enabled: true
+    }
+});
+
+function hasUsableCredential(account) {
+    if (!account || typeof account !== "object") {
+        return false;
+    }
+
+    const hash = account.passwordHash;
+    const hasBcryptHash =
+        typeof hash === "string" &&
+        /^\$2[aby]\$\d{2}\$/.test(hash);
+
+    const encrypted = account.encryptedPassword;
+    const hasEncryptedPassword =
+        !!encrypted &&
+        typeof encrypted === "object" &&
+        typeof encrypted.iv === "string" &&
+        typeof encrypted.content === "string" &&
+        typeof encrypted.tag === "string";
+
+    return hasBcryptHash || hasEncryptedPassword;
+}
+
+function createDefaultAccount(type, now) {
+    const config = DEFAULT_FRONTEND_ACCOUNT_CONFIG[type];
 
     return {
-
-        gallery: {
-            username:
-                "gallery",
-
-            passwordHash:
-                "",
-
-            encryptedPassword:
-                null,
-
-            enabled:
-                true,
-
-            updatedAt:
-                now
-        },
-
-        articles: {
-            username:
-                "articles",
-
-            passwordHash:
-                "",
-
-            encryptedPassword:
-                null,
-
-            enabled:
-                true,
-
-            updatedAt:
-                now
-        }
+        username: config.username,
+        passwordHash: "",
+        encryptedPassword: null,
+        enabled: config.enabled,
+        permissions: [...config.permissions],
+        updatedAt: now
     };
 }
 
+function createDefaultFrontendAuth() {
+    const now = new Date().toISOString();
+
+    return {
+        admin: createDefaultAccount("admin", now),
+        gallery: createDefaultAccount("gallery", now),
+        articles: createDefaultAccount("articles", now)
+    };
+}
+
+/**
+ * Upgrades legacy frontend-auth.json records without replacing credentials.
+ *
+ * Existing usernames, password hashes, encrypted passwords, enabled flags,
+ * timestamps, and additional account metadata are retained. Missing accounts
+ * and permissions are added using safe defaults.
+ */
+function normalizeFrontendAuth(input) {
+    if (
+        !input ||
+        typeof input !== "object" ||
+        Array.isArray(input) ||
+        !input.gallery ||
+        !input.articles
+    ) {
+        throw new Error("Invalid frontend-auth.json account structure.");
+    }
+
+    const now = new Date().toISOString();
+    const output = { ...input };
+
+    for (const type of FRONTEND_ACCOUNT_TYPES) {
+        const defaults = createDefaultAccount(type, now);
+        const existing = input[type];
+
+        if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+            output[type] = defaults;
+            continue;
+        }
+
+        const account = { ...defaults, ...existing };
+
+        if (
+            typeof account.username !== "string" ||
+            !account.username.trim()
+        ) {
+            account.username = defaults.username;
+        }
+
+        if (
+            typeof account.passwordHash !== "string"
+        ) {
+            account.passwordHash = "";
+        }
+
+        if (
+            account.encryptedPassword === undefined
+        ) {
+            account.encryptedPassword = null;
+        }
+
+        if (typeof account.enabled !== "boolean") {
+            account.enabled = defaults.enabled;
+        }
+
+        if (
+            typeof account.updatedAt !== "string" ||
+            !account.updatedAt
+        ) {
+            account.updatedAt = now;
+        }
+
+        const rawPermissions = Array.isArray(existing.permissions)
+            ? existing.permissions
+            : defaults.permissions;
+
+        account.permissions = [
+            ...new Set(
+                rawPermissions.filter(
+                    permission =>
+                        FRONTEND_PERMISSION_SET.includes(permission)
+                )
+            )
+        ];
+
+        // Never enable a newly-added or existing admin account without
+        // a credential that the verifier can actually use.
+        if (type === "admin" && !hasUsableCredential(account)) {
+            account.enabled = false;
+        }
+
+        output[type] = account;
+    }
+
+    return output;
+}
+
+function isFrontendAccountType(type) {
+    return FRONTEND_ACCOUNT_TYPES.includes(type);
+}
 
 // =========================================================
 // LOAD FRONTEND AUTH
@@ -530,83 +652,65 @@ function createDefaultFrontendAuth() {
 export async function loadFrontendAuth(
     env
 ) {
-
     if (cachedFrontendAuth) {
         return cachedFrontendAuth;
     }
 
-
     let accessToken;
     let file;
-
 
     // -----------------------------------------------------
     // TRY GOOGLE DRIVE
     // -----------------------------------------------------
-
     try {
-
-        accessToken =
-            await getAccessToken(env);
-
-        file =
-            await findFrontendAuthFile(
-                env,
-                accessToken
-            );
-
-    }
-    catch (error) {
-
+        accessToken = await getAccessToken(env);
+        file = await findFrontendAuthFile(env, accessToken);
+    } catch (error) {
         console.warn(
-            "Frontend auth Drive unavailable. " +
-            "Trying KV backup:",
-            error?.message ||
-            error
+            "Frontend auth Drive unavailable. Trying KV backup:",
+            error?.message || error
         );
 
-        const backup =
-            await readKVFrontendAuth(
-                env
-            );
+        const backup = await readKVFrontendAuth(env);
 
         if (backup) {
-
-            cachedFrontendAuth =
-                backup;
-
+            cachedFrontendAuth = normalizeFrontendAuth(backup);
             return cachedFrontendAuth;
         }
 
         throw error;
     }
 
-
     // -----------------------------------------------------
     // FILE DOES NOT EXIST
     // -----------------------------------------------------
-
     if (!file) {
-
-        const backup =
-            await readKVFrontendAuth(
-                env
-            );
+        const backup = await readKVFrontendAuth(env);
 
         if (backup) {
+            const normalizedBackup = normalizeFrontendAuth(backup);
 
-            cachedFrontendAuth =
-                backup;
+            // Drive is the source of truth. Since the Drive file is absent,
+            // attempt to restore it from the last known KV backup.
+            try {
+                await writeFrontendAuthFile(
+                    env,
+                    accessToken,
+                    normalizedBackup
+                );
+                await writeKVFrontendAuth(env, normalizedBackup);
+            } catch (error) {
+                console.warn(
+                    "Unable to restore frontend auth file from KV:",
+                    error?.message || error
+                );
+            }
 
+            cachedFrontendAuth = normalizedBackup;
             return cachedFrontendAuth;
         }
 
-
-        // Match old backend:
-        // create frontend-auth.json if absent.
-
-        const initial =
-            createDefaultFrontendAuth();
+        const initial = createDefaultFrontendAuth();
 
         await writeFrontendAuthFile(
             env,
@@ -615,96 +719,76 @@ export async function loadFrontendAuth(
         );
 
         try {
-
-            await writeKVFrontendAuth(
-                env,
-                initial
-            );
-
-        }
-        catch (error) {
-
+            await writeKVFrontendAuth(env, initial);
+        } catch (error) {
             console.warn(
                 "Unable to create frontend auth KV backup:",
-                error?.message ||
-                error
+                error?.message || error
             );
         }
 
-        cachedFrontendAuth =
-            initial;
-
+        cachedFrontendAuth = initial;
         return cachedFrontendAuth;
     }
-
 
     // -----------------------------------------------------
     // DRIVE FILE EXISTS
     // -----------------------------------------------------
-
-    let data;
+    let storedData;
 
     try {
-
-        data =
-            await readFrontendAuthFile(
-                accessToken,
-                file
-            );
-
-    }
-    catch (error) {
-
+        storedData = await readFrontendAuthFile(accessToken, file);
+    } catch (error) {
         console.warn(
-            "Unable to read frontend-auth.json " +
-            "from Google Drive. Trying KV backup:",
-            error?.message ||
-            error
+            "Unable to read frontend-auth.json from Google Drive. Trying KV backup:",
+            error?.message || error
         );
 
-        const backup =
-            await readKVFrontendAuth(
-                env
-            );
+        const backup = await readKVFrontendAuth(env);
 
         if (backup) {
-
-            cachedFrontendAuth =
-                backup;
-
+            cachedFrontendAuth = normalizeFrontendAuth(backup);
             return cachedFrontendAuth;
         }
 
         throw error;
     }
 
+    // Add the new account/permission schema while preserving the stored
+    // credentials for existing accounts.
+    const normalizedData = normalizeFrontendAuth(storedData);
+    const schemaChanged =
+        JSON.stringify(storedData) !== JSON.stringify(normalizedData);
 
-    // -----------------------------------------------------
-    // DRIVE IS SOURCE OF TRUTH
-    // REFRESH KV BACKUP
-    // -----------------------------------------------------
-
-    try {
-
-        await writeKVFrontendAuth(
-            env,
-            data
-        );
-
+    if (schemaChanged) {
+        try {
+            await writeFrontendAuthFile(
+                env,
+                accessToken,
+                normalizedData,
+                file
+            );
+        } catch (error) {
+            // Continue with normalized data for this isolate, but report
+            // that the migration did not persist to Drive.
+            console.error(
+                "Frontend auth schema migration could not be saved to Drive:",
+                error?.message || error
+            );
+        }
     }
-    catch (error) {
 
+    // Drive remains the source of truth; refresh KV with normalized data.
+    try {
+        await writeKVFrontendAuth(env, normalizedData);
+    } catch (error) {
         console.warn(
             "Unable to update frontend auth KV backup:",
-            error?.message ||
-            error
+            error?.message || error
         );
     }
 
-
-    cachedFrontendAuth =
-        data;
-
+    cachedFrontendAuth = normalizedData;
     return cachedFrontendAuth;
 }
 
@@ -779,51 +863,46 @@ export async function updateFrontendPassword(
     type,
     password
 ) {
-
-    if (
-        type !== "gallery" &&
-        type !== "articles"
-    ) {
-        throw new Error(
-            "Invalid frontend type"
-        );
+    if (!isFrontendAccountType(type)) {
+        throw new Error("Invalid frontend account type.");
     }
 
-    const data =
-        await loadFrontendAuth(
-            env
-        );
+    if (typeof password !== "string" || password.length === 0) {
+        throw new Error("Password must be a non-empty string.");
+    }
 
+    if (password.length > 1024) {
+        throw new Error("Password is too long.");
+    }
 
-    data[type].passwordHash =
-        await bcrypt.hash(
-            password,
-            12
-        );
-        
-    
-    data[type].encryptedPassword =
-        await encryptPassword(
-            password,
-            env
-        );
+    // Copy before changing so a failed Drive save does not mutate the
+    // in-memory object that was previously loaded from storage.
+    const current = await loadFrontendAuth(env);
+    const data = JSON.parse(JSON.stringify(current));
+    const now = new Date().toISOString();
 
+    if (!data[type]) {
+        data[type] = createDefaultAccount(type, now);
+    }
 
-    // NOTE:
-    // The old backend also stores encryptedPassword.
-    // Keep this field intact unless your Worker already
-    // has the same passwordCrypto implementation.
+    data[type].passwordHash = await bcrypt.hash(password, 12);
+    data[type].encryptedPassword = await encryptPassword(password, env);
+    data[type].updatedAt = now;
 
-    data[type].updatedAt =
-        new Date().toISOString();
+    // Setting an admin password is an explicit provisioning action.
+    // It enables the account only after both credential formats are made.
+    if (type === "admin") {
+        data[type].enabled = true;
+    }
 
+    await saveFrontendAuth(env, normalizeFrontendAuth(data));
 
-    await saveFrontendAuth(
-        env,
-        data
-    );
-
-    return data[type];
+    return {
+        username: data[type].username,
+        enabled: data[type].enabled,
+        permissions: [...data[type].permissions],
+        updatedAt: data[type].updatedAt
+    };
 }
 
 
@@ -838,10 +917,7 @@ export async function verifyFrontendPassword(
     type,
     password
 ) {
-    if (
-        type !== "gallery" &&
-        type !== "articles"
-    ) {
+    if (!isFrontendAccountType(type)) {
         return false;
     }
 
@@ -918,36 +994,24 @@ export async function verifyFrontendPassword(
 export async function getFrontendAccounts(
     env
 ) {
+    const data = await loadFrontendAuth(env);
 
-    const data =
-        await loadFrontendAuth(
-            env
-        );
+    return Object.fromEntries(
+        FRONTEND_ACCOUNT_TYPES.map(type => {
+            const account = data[type];
 
-    return {
-
-        gallery: {
-            username:
-                data.gallery.username,
-
-            enabled:
-                data.gallery.enabled,
-
-            updatedAt:
-                data.gallery.updatedAt
-        },
-
-        articles: {
-            username:
-                data.articles.username,
-
-            enabled:
-                data.articles.enabled,
-
-            updatedAt:
-                data.articles.updatedAt
-        }
-    };
+            return [
+                type,
+                {
+                    username: account.username,
+                    enabled: account.enabled,
+                    permissions: [...account.permissions],
+                    updatedAt: account.updatedAt,
+                    hasPassword: hasUsableCredential(account)
+                }
+            ];
+        })
+    );
 }
 
 
@@ -963,26 +1027,25 @@ export async function getFrontendAccounts(
 export async function getFrontendPassword(
     env,
     type
-    
 ) {
-
-    const data =
-        await loadFrontendAuth(
-            env
-        );
-
-    if (
-        !data[type]?.encryptedPassword
-    ) {
-        throw new Error(
-            "Password reveal unavailable"
-        );
+    if (!isFrontendAccountType(type)) {
+        throw new Error("Invalid frontend account type.");
     }
 
-    return decryptPassword(
-        data[type].encryptedPassword,
-        env
-    );
+    const data = await loadFrontendAuth(env);
+    const encryptedPassword = data[type]?.encryptedPassword;
+
+    if (
+        !encryptedPassword ||
+        typeof encryptedPassword !== "object" ||
+        typeof encryptedPassword.iv !== "string" ||
+        typeof encryptedPassword.content !== "string" ||
+        typeof encryptedPassword.tag !== "string"
+    ) {
+        throw new Error("Password reveal unavailable.");
+    }
+
+    return decryptPassword(encryptedPassword, env);
 }
 
 

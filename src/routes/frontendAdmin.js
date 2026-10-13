@@ -4,6 +4,10 @@
  * GET  /admin/frontend/accounts
  * POST /admin/frontend/:type/password
  * GET  /admin/frontend/:type/password
+ *
+ * These routes must remain protected by requireAdmin() in index.js.
+ * The initial shared Admin password can only be provisioned through that
+ * existing authenticated admin session.
  */
 
 import {
@@ -14,19 +18,17 @@ import {
 } from "../auth/frontendAuthDrive.js";
 
 function json(data, status = 200) {
-    return Response.json(
-        data,
-        {
-            status,
-            headers: {
-                "Cache-Control": "no-store, private"
-            }
+    return Response.json(data, {
+        status,
+        headers: {
+            "Cache-Control": "no-store, private"
         }
-    );
+    });
 }
 
 function isValidFrontendType(type) {
     return (
+        type === "admin" ||
         type === "gallery" ||
         type === "articles"
     );
@@ -40,28 +42,19 @@ async function readJson(request) {
     }
 }
 
-
 /*
  * GET /admin/frontend/accounts
  */
 async function accounts(request, env) {
-
     try {
-
-        const accounts =
-            await getFrontendAccounts(env);
+        const accountData = await getFrontendAccounts(env);
 
         return json({
             success: true,
-            ...accounts
+            ...accountData
         });
-
     } catch (error) {
-
-        console.error(
-            "FRONTEND ACCOUNTS ERROR:",
-            error
-        );
+        console.error("FRONTEND ACCOUNTS ERROR:", error);
 
         return json({
             success: false,
@@ -70,220 +63,166 @@ async function accounts(request, env) {
     }
 }
 
-
 /*
  * POST /admin/frontend/:type/password
+ *
+ * For admin:
+ * - If no usable password exists yet, allow one-time provisioning through
+ *   the existing requireAdmin()-protected route.
+ * - Once a password exists, require the current password for changes.
+ *
+ * Gallery and Articles retain their existing current-password requirement.
  */
 async function updatePassword(request, env, type) {
-
     try {
-
         if (!isValidFrontendType(type)) {
-
             return json({
                 success: false,
                 message: "Invalid frontend type"
             }, 400);
         }
 
+        const body = await readJson(request);
 
-        const body =
-            await readJson(request);
-
-        const currentPassword =
-            body?.currentPassword;
-
-        const newPassword =
-            body?.newPassword;
-
-
-        if (
-            !currentPassword ||
-            !newPassword
-        ) {
-
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
             return json({
                 success: false,
-                message:
-                    "Current password and new password required"
+                message: "Invalid JSON body"
             }, 400);
         }
 
+        const { currentPassword, newPassword } = body;
 
-        /*
-         * Verify old password first
-         */
-        const valid =
-            await verifyFrontendPassword(
+        if (
+            typeof newPassword !== "string" ||
+            newPassword.length < 8 ||
+            newPassword.length > 1024
+        ) {
+            return json({
+                success: false,
+                message: "New password must be between 8 and 1024 characters"
+            }, 400);
+        }
+
+        // Account metadata includes hasPassword and is loaded from the
+        // Drive/KV-backed account store.
+        const accountData = await getFrontendAccounts(env);
+        const account = accountData?.[type];
+
+        if (!account) {
+            return json({
+                success: false,
+                message: "Frontend account not found"
+            }, 404);
+        }
+
+        const firstAdminProvisioning =
+            type === "admin" &&
+            account.hasPassword === false;
+
+        if (!firstAdminProvisioning) {
+            if (
+                typeof currentPassword !== "string" ||
+                currentPassword.length === 0
+            ) {
+                return json({
+                    success: false,
+                    message: "Current password and new password required"
+                }, 400);
+            }
+
+            const valid = await verifyFrontendPassword(
                 env,
                 type,
                 currentPassword
             );
 
-
-        if (!valid) {
-
-            return json({
-                success: false,
-                message: "Wrong current password"
-            }, 401);
+            if (!valid) {
+                return json({
+                    success: false,
+                    message: "Wrong current password"
+                }, 401);
+            }
         }
 
-
-        /*
-         * Password rules
-         */
-        if (newPassword.length < 8) {
-
-            return json({
-                success: false,
-                message:
-                    "Password must be at least 8 characters"
-            }, 400);
-        }
-
-
-        /*
-         * Update password
-         */
-        await updateFrontendPassword(
-            env,
-            type,
-            newPassword
-        );
-
+        await updateFrontendPassword(env, type, newPassword);
 
         return json({
             success: true,
-            message:
-                "Frontend password updated successfully"
+            message: firstAdminProvisioning
+                ? "Shared Admin password provisioned successfully"
+                : "Frontend password updated successfully"
         });
-
     } catch (error) {
-
-        console.error(
-            "FRONTEND PASSWORD UPDATE ERROR:",
-            error
-        );
+        console.error("FRONTEND PASSWORD UPDATE ERROR:", error);
 
         return json({
             success: false,
-            message:
-                "Unable to update frontend password"
+            message: "Unable to update frontend password"
         }, 500);
     }
 }
 
-
 /*
  * GET /admin/frontend/:type/password
+ *
+ * Password reveal remains available only through the existing protected
+ * admin route. It is not used for initial Admin provisioning.
  */
 async function revealPassword(request, env, type) {
-
     try {
-
         if (!isValidFrontendType(type)) {
-
             return json({
                 success: false,
                 message: "Invalid frontend type"
             }, 400);
         }
 
-
-        const password =
-            await getFrontendPassword(
-                env,
-                type
-            );
-
+        const password = await getFrontendPassword(env, type);
 
         return json({
             success: true,
             password
         });
-
     } catch (error) {
-
-        console.error(
-            "FRONTEND PASSWORD REVEAL ERROR:",
-            error
-        );
+        console.error("FRONTEND PASSWORD REVEAL ERROR:", error);
 
         return json({
             success: false,
-            message:
-                "Unable to reveal password"
+            message: "Unable to reveal password"
         }, 500);
     }
 }
 
-
 /*
  * ROUTER
  */
-export async function frontendAdminRoute(
-    request,
-    env
-) {
+export async function frontendAdminRoute(request, env) {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
 
-    const url =
-        new URL(request.url);
-
-    const pathname =
-        url.pathname;
-
-
-    /*
-     * GET /admin/frontend/accounts
-     */
     if (
         request.method === "GET" &&
         pathname === "/admin/frontend/accounts"
     ) {
-
-        return accounts(
-            request,
-            env
-        );
+        return accounts(request, env);
     }
 
-
-    /*
-     * /admin/frontend/:type/password
-     */
-    const match =
-        pathname.match(
-            /^\/admin\/frontend\/(gallery|articles)\/password$/
-        );
-
+    const match = pathname.match(
+        /^\/admin\/frontend\/(admin|gallery|articles)\/password$/
+    );
 
     if (match) {
-
-        const type =
-            match[1];
-
+        const type = match[1];
 
         if (request.method === "POST") {
-
-            return updatePassword(
-                request,
-                env,
-                type
-            );
+            return updatePassword(request, env, type);
         }
-
 
         if (request.method === "GET") {
-
-            return revealPassword(
-                request,
-                env,
-                type
-            );
+            return revealPassword(request, env, type);
         }
     }
-
 
     return json({
         success: false,

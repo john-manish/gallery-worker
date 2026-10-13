@@ -25,21 +25,16 @@ import {
 } from "../articles/articleDrive.js";
 
 import {
-  verifyFrontendPassword
-} from "../auth/frontendAuthDrive.js";
+  authenticateFrontend
+} from "../auth/frontendAuth.js";
 
 
 // ============================================================
-// CONSTANTS
+// SHARED FRONTEND AUTHORIZATION
 // ============================================================
 
-const ARTICLE_COOKIE = "article_session";
-
-const ARTICLE_SESSION_MAX_AGE =
-  60 * 60 * 24 * 30;
-
-
-
+// Protected articles use the shared Articles frontend session.
+// The shared login route creates and validates this session.
 
 // ============================================================
 // RESPONSE HELPERS
@@ -87,101 +82,17 @@ function error(
 
 
 // ============================================================
-// COOKIE HELPERS
+// SHARED ARTICLES SESSION CHECK
 // ============================================================
 
-function getCookie(
-  request,
-  name
-) {
-  const cookieHeader =
-    request.headers.get(
-      "Cookie"
-    ) || "";
-
-  if (!cookieHeader) {
-    return null;
-  }
-
-  const cookies =
-    cookieHeader.split(";");
-
-  for (
-    const part
-    of cookies
-  ) {
-    const index =
-      part.indexOf("=");
-
-    if (index === -1) {
-      continue;
-    }
-
-    const key =
-      part
-        .slice(
-          0,
-          index
-        )
-        .trim();
-
-    if (
-      key !== name
-    ) {
-      continue;
-    }
-
-    return decodeURIComponent(
-      part
-        .slice(
-          index + 1
-        )
-        .trim()
-    );
-  }
-
-  return null;
-}
-
-
-function isArticleAuthorized(
-  request
-) {
-  return (
-    getCookie(
-      request,
-      ARTICLE_COOKIE
-    ) === "granted"
+async function isArticleAuthorized(request, env) {
+  const result = await authenticateFrontend(
+    request,
+    env,
+    "articles"
   );
-}
 
-
-// ============================================================
-// COOKIE RESPONSE
-// ============================================================
-
-function articleLoginCookie() {
-  return [
-    `${ARTICLE_COOKIE}=granted`,
-    "Path=/",
-    "HttpOnly",
-    "Secure",
-    "SameSite=None",
-    `Max-Age=${ARTICLE_SESSION_MAX_AGE}`
-  ].join("; ");
-}
-
-
-function articleLogoutCookie() {
-  return [
-    `${ARTICLE_COOKIE}=`,
-    "Path=/",
-    "HttpOnly",
-    "Secure",
-    "SameSite=None",
-    "Max-Age=0",
-    "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-  ].join("; ");
+  return Boolean(result?.authenticated);
 }
 
 
@@ -542,8 +453,9 @@ async function getArticleStatus(
         ),
 
       authorized:
-        isArticleAuthorized(
-          request
+        await isArticleAuthorized(
+          request,
+          env
         )
     }
   );
@@ -551,113 +463,9 @@ async function getArticleStatus(
 
 
 // ============================================================
-// POST /articles/login
-//
-// Uses the SAME existing Cloudflare frontend article
-// password system.
-//
-// verifyFrontendPassword(
-//   env,
-//   "articles",
-//   password
-// )
-//
-// No new password storage.
+// Login and logout are handled by the shared frontend auth routes.
+// Protected article content checks the shared Articles session.
 // ============================================================
-
-async function login(
-  request,
-  env
-) {
-  try {
-    let body;
-
-    try {
-      body =
-        await request.json();
-    } catch {
-      return error(
-        "Invalid JSON body",
-        400
-      );
-    }
-
-    const password =
-      typeof body?.password ===
-      "string"
-        ? body.password
-        : "";
-
-    if (!password) {
-      return error(
-        "Password is required",
-        400
-      );
-    }
-
-    const valid =
-      await verifyFrontendPassword(
-        env,
-        "articles",
-        password
-      );
-
-    if (!valid) {
-      return json(
-        {
-          success: false,
-          message:
-            "Wrong password"
-        },
-        401
-      );
-    }
-
-    return json(
-      {
-        success: true
-      },
-      200,
-      {
-        "Set-Cookie":
-          articleLoginCookie()
-      }
-    );
-
-  } catch (err) {
-    console.error(
-      "ARTICLE LOGIN ERROR:",
-      err
-    );
-
-    return json(
-      {
-        success: false,
-        message:
-          "Login failed"
-      },
-      500
-    );
-  }
-}
-
-
-// ============================================================
-// POST /articles/logout
-// ============================================================
-
-async function logout() {
-  return json(
-    {
-      success: true
-    },
-    200,
-    {
-      "Set-Cookie":
-        articleLogoutCookie()
-    }
-  );
-}
 
 
 // ============================================================
@@ -845,7 +653,7 @@ ${content}
 // Returns rendered HTML.
 //
 // Protected article:
-//     no article_session → 401
+//     no valid Articles frontend session → 401
 //
 // Public article:
 //     immediately available
@@ -880,9 +688,10 @@ async function getArticleContent(
 
   if (
     isProtected(article) &&
-    !isArticleAuthorized(
-      request
-    )
+    !(await isArticleAuthorized(
+      request,
+      env
+    ))
   ) {
     return error(
       "Unauthorized",
@@ -943,7 +752,7 @@ async function getArticleContent(
 //
 // Returns the original Markdown stored inside Drive JSON.
 //
-// Protected articles require article_session.
+// Protected articles require the shared Articles frontend session.
 // ============================================================
 
 async function getArticleRaw(
@@ -975,9 +784,10 @@ async function getArticleRaw(
 
   if (
     isProtected(article) &&
-    !isArticleAuthorized(
-      request
-    )
+    !(await isArticleAuthorized(
+      request,
+      env
+    ))
   ) {
     return error(
       "Unauthorized",
@@ -1037,33 +847,8 @@ async function articlesRouteInternal(
 
 
   // ==========================================================
-  // POST /articles/login
+  // Shared login/logout routes are handled by frontendAuth.
   // ==========================================================
-
-  if (
-    request.method === "POST" &&
-    pathname ===
-      "/articles/login"
-  ) {
-    return login(
-      request,
-      env
-    );
-  }
-
-
-  // ==========================================================
-  // POST /articles/logout
-  // ==========================================================
-
-  if (
-    request.method === "POST" &&
-    pathname ===
-      "/articles/logout"
-  ) {
-    return logout();
-  }
-
 
   // ==========================================================
   // GET /articles

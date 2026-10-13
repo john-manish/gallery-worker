@@ -22,9 +22,6 @@ import { galleryRoute } from "./routes/gallery.js";
 import { imageRoute } from "./routes/image.js";
 import { thumbRoute } from "./routes/thumb.js";
 
-import { getDriveFile } from "./drive/google.js";
-import { readGallery } from "./gallery/repository.js";
-
 
 // =========================================================
 // HELPERS
@@ -39,8 +36,6 @@ function jsonError(message, status = 404) {
     { status }
   );
 }
-
-
 
 
 // =========================================================
@@ -94,8 +89,6 @@ function applyCors(request, response, env) {
 }
 
 
-
-
 // =========================================================
 // WORKER
 // =========================================================
@@ -128,229 +121,6 @@ async function handleRequest(request, env, ctx) {
 
 
       // =======================================================
-      // DEVELOPMENT / DIAGNOSTIC
-      // =======================================================
-
-      if (
-        request.method === "GET" &&
-        pathname === "/drive/test"
-      ) {
-
-        if (!env.GOOGLE_CLIENT_EMAIL) {
-
-          return jsonError(
-            "GOOGLE_CLIENT_EMAIL is missing",
-            500
-          );
-
-        }
-
-        if (!env.GOOGLE_PRIVATE_KEY) {
-
-          return jsonError(
-            "GOOGLE_PRIVATE_KEY is missing",
-            500
-          );
-
-        }
-
-        if (!env.DRIVE_METADATA_ID) {
-
-          return jsonError(
-            "DRIVE_METADATA_ID is missing",
-            500
-          );
-
-        }
-
-        const file =
-          await getDriveFile(
-            env,
-            env.DRIVE_METADATA_ID
-          );
-
-        return Response.json({
-          ok: true,
-          drive: file
-        });
-
-      }
-
-
-
-
-
-            if (
-        request.method === "GET" &&
-        pathname === "/test/articles"
-      ) {
-
-        try {
-
-          const {
-            listDriveFiles
-          } = await import(
-            "./drive/google.js"
-          );
-
-          if (!env.DRIVE_ARTICLES_DATABASE_ID) {
-            return Response.json({
-              success: false,
-              error:
-                "DRIVE_ARTICLES_DATABASE_ID is missing"
-            }, {
-              status: 500
-            });
-          }
-
-          const result =
-            await listDriveFiles(
-              env,
-              [
-                `'${env.DRIVE_ARTICLES_DATABASE_ID}' in parents`,
-                "trashed=false"
-              ].join(" and "),
-              "files(id,name,mimeType,size,modifiedTime,createdTime,parents)"
-            );
-
-          return Response.json({
-            success: true,
-            folderId:
-              env.DRIVE_ARTICLES_DATABASE_ID,
-            total:
-              result.files?.length || 0,
-            files:
-              result.files || []
-          });
-
-        } catch (error) {
-
-          console.error(
-            "Article Drive folder test failed:",
-            error
-          );
-
-          return Response.json({
-            success: false,
-            error: error.message
-          }, {
-            status: 500
-          });
-
-        }
-
-      }
-
-
-
-
-
-if (
-  request.method === "GET" &&
-  pathname === "/test/articles-provider"
-) {
-
-  try {
-
-    const {
-      listArticles
-    } = await import(
-      "./articles/articleDrive.js"
-    );
-
-    const result =
-      await listArticles(env);
-
-    return Response.json({
-      success: true,
-      total: result.total,
-      articles: result.rows
-    });
-
-  } catch (error) {
-
-    console.error(
-      "Article provider test failed:",
-      error
-    );
-
-    return Response.json({
-      success: false,
-      error: error.message
-    }, {
-      status: 500
-    });
-
-  }
-
-}
-
-
-
-
-if (
-  request.method === "GET" &&
-  pathname === "/test/articles-root"
-) {
-
-  try {
-
-    const {
-      listDriveFiles
-    } = await import("./drive/google.js");
-
-    if (!env.DRIVE_ARTICLES_ROOT_ID) {
-      return Response.json({
-        success: false,
-        error: "DRIVE_ARTICLES_ROOT_ID is missing"
-      }, {
-        status: 500
-      });
-    }
-
-    const result =
-      await listDriveFiles(
-        env,
-        [
-          `'${env.DRIVE_ARTICLES_ROOT_ID}' in parents`,
-          "trashed=false"
-        ].join(" and "),
-        "files(id,name,mimeType,size,modifiedTime,createdTime,parents)"
-      );
-
-    return Response.json({
-      success: true,
-      folderId: env.DRIVE_ARTICLES_ROOT_ID,
-      total: result.files?.length || 0,
-      files: result.files || []
-    });
-
-  } catch (error) {
-
-    console.error(
-      "Article root Drive test failed:",
-      error
-    );
-
-    return Response.json({
-      success: false,
-      error: error.message
-    }, {
-      status: 500
-    });
-
-  }
-
-}
-
-
-
-
-
-
-
-
-// =======================================================
 // AUTH
 // =======================================================
 
@@ -394,7 +164,6 @@ if (
 }
 
 
-
 // -------------------------------------------------------
 // ADMIN AUTH
 // -------------------------------------------------------
@@ -407,10 +176,6 @@ if (
         env
     );
 }
-
-
-
-
 
 
       // =======================================================
@@ -511,9 +276,6 @@ if (
       }
 
 
-
-
-
 // =======================================================
 // PUBLIC ARTICLES
 // =======================================================
@@ -548,83 +310,43 @@ if (
 }
 
 
-
       // =======================================================
-      // GALLERY
+      // GALLERY API — shared frontend authentication
       // =======================================================
-
-// =======================================================
-// GALLERY
-// =======================================================
 
 if (
-    pathname === "/gallery" ||
-    pathname.startsWith("/gallery/")
-) {
-    // First, allow an existing admin session.
-    const adminAuth = await requireAdmin(
-        request,
-        env
-    );
-
-    if (adminAuth.authenticated) {
-        return galleryRoute(
-            request,
-            env,
-            ctx
-        );
-    }
-
-    // Otherwise, require the gallery frontend account.
-    const frontendAuth = await authenticateFrontend(
-        request,
-        env,
-        "gallery"
-    );
-
-    if (!frontendAuth.authenticated) {
-        return adminAuth.response;
-    }
-
-    return galleryRoute(
-        request,
-        env,
-        ctx
-    );
-}
-
-
-      // =======================================================
-      // GALLERY TEST
-      // =======================================================
-
-      if (
-        request.method === "GET" &&
-        pathname === "/gallery/test"
+        pathname === "/gallery" ||
+        pathname.startsWith("/gallery/")
       ) {
+        const frontendAuth = await authenticateFrontend(
+          request,
+          env,
+          "gallery"
+        );
 
-        const authResponse =
-          await requireAdmin(
-            request,
-            env
+        if (!frontendAuth.authenticated) {
+          const status =
+            frontendAuth.message === "Permission denied" ? 403 : 401;
+
+          return Response.json(
+            {
+              success: false,
+              authenticated: false,
+              message: frontendAuth.message || "Not authenticated"
+            },
+            {
+              status,
+              headers: {
+                "Cache-Control": "no-store, private"
+              }
+            }
           );
+        }
 
-        if (!authResponse.authenticated) {
-  return authResponse.response;
-}
-
-        const gallery =
-          await readGallery(env);
-
-        return Response.json({
-          ok: true,
-          count: gallery.length,
-          gallery
-        });
+        return galleryRoute(request, env, ctx);
       }
 
 
-      // =======================================================
       // IMAGES
       // =======================================================
 
@@ -692,16 +414,15 @@ if (
       }
 
 
-
-
 // =======================================================
-// FRONTEND ADMIN
+// FRONTEND ACCOUNT MANAGEMENT — existing admin-console authentication
 // =======================================================
 
 if (
     pathname === "/admin/frontend/accounts" ||
-    /^\/admin\/frontend\/(gallery|articles)\/password$/.test(pathname)
+    /^\/admin\/frontend\/(admin|gallery|articles)\/password$/.test(pathname)
 ) {
+
 
     const authResponse =
         await requireAdmin(
@@ -718,7 +439,6 @@ if (
         env
     );
 }
-
 
 
       // =======================================================
@@ -750,27 +470,30 @@ if (
       //
       // =======================================================
 
+      // =======================================================
+      // ARTICLES MANAGEMENT API — shared Articles-area auth
+      //                         --native backend admin auth
+      // =======================================================
+
+
+
+
       if (
         pathname === "/admin/articles" ||
         pathname.startsWith("/admin/articles/")
       ) {
-
-        const authResponse =
-          await requireAdmin(
-            request,
-            env
-          );
+        const authResponse = await requireAdmin(
+          request,
+          env
+        );
 
         if (!authResponse.authenticated) {
           return authResponse.response;
         }
 
-        return adminArticlesRoute(
-          request,
-          env,
-          ctx
-        );
+        return adminArticlesRoute(request, env, ctx);
       }
+
 
 
       if (

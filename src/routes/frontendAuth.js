@@ -1,4 +1,3 @@
-
 import {
     loadFrontendAuth,
     verifyFrontendPassword
@@ -9,7 +8,8 @@ import {
 } from "../auth/auth.js";
 
 import {
-    authenticateFrontend
+    authenticateFrontend,
+    FRONTEND_COOKIES
 } from "../auth/frontendAuth.js";
 
 import {
@@ -19,20 +19,40 @@ import {
 } from "../auth/jwt.js";
 
 /* =========================================================
-   CONFIGURATION
-========================================================= */
+   SHARED FRONTEND AUTH ROUTES
 
-const FRONTEND_COOKIES = Object.freeze({
-    gallery: "gallery_frontend_token",
-    articles: "articles_frontend_token"
-});
+   Request body:
+   {
+       "type": "gallery" | "articles" | "dashboard",
+       "username": "...",
+       "password": "..."
+   }
+
+   `type` means the area being opened, not the stored account type.
+
+   Accounts:
+     admin    -> gallery, articles, dashboard
+     gallery  -> gallery
+     articles -> articles
+
+   A successful login creates a session cookie for the requested
+   area only. Admin can separately sign in to each permitted area.
+========================================================= */
 
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60;
 
-const VALID_TYPES = new Set([
+const VALID_AREAS = new Set([
     "gallery",
-    "articles"
+    "articles",
+    "dashboard"
 ]);
+
+const DEFAULT_PERMISSIONS = Object.freeze({
+    admin: ["gallery", "articles", "dashboard"],
+    gallery: ["gallery"],
+    articles: ["articles"]
+});
+
 
 /* =========================================================
    RESPONSE HELPERS
@@ -67,21 +87,15 @@ async function readJson(request) {
     }
 }
 
-function isValidFrontendType(type) {
-    return VALID_TYPES.has(type);
+function isValidArea(area) {
+    return VALID_AREAS.has(area);
 }
-
-/* =========================================================
-   COOKIE OPTIONS
-========================================================= */
 
 function isLocalRequest(request) {
     const hostname = new URL(request.url).hostname;
 
-    return (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1"
-    );
+    return hostname === "localhost" ||
+        hostname === "127.0.0.1";
 }
 
 function getCookieOptions(request) {
@@ -107,6 +121,7 @@ function getClearCookieOptions(request) {
     };
 }
 
+
 /* =========================================================
    COOKIE HELPERS
 ========================================================= */
@@ -117,17 +132,13 @@ function getCookieValue(request, name) {
     for (const part of header.split(";")) {
         const separator = part.indexOf("=");
 
-        if (separator === -1) {
-            continue;
-        }
+        if (separator === -1) continue;
 
         const key = part.slice(0, separator).trim();
 
-        if (key !== name) {
-            continue;
+        if (key === name) {
+            return part.slice(separator + 1).trim();
         }
-
-        return part.slice(separator + 1).trim();
     }
 
     return null;
@@ -135,22 +146,22 @@ function getCookieValue(request, name) {
 
 function getPresentFrontendCookies(request) {
     return Object.entries(FRONTEND_COOKIES)
-        .filter(([, cookieName]) => {
-            return Boolean(getCookieValue(request, cookieName));
-        })
-        .map(([type]) => type);
+        .filter(([, cookieName]) =>
+            Boolean(getCookieValue(request, cookieName))
+        )
+        .map(([area]) => area);
 }
 
+
 /* =========================================================
-   FRONTEND TYPE RESOLUTION
+   FRONTEND AREA RESOLUTION
 
    Priority:
-   1. Explicit ?type=gallery or ?type=articles
-   2. Requesting page's Referer path
-   3. Exactly one frontend session cookie
+   1. Explicit ?type=gallery|articles|dashboard
+   2. Same-origin Referer path
+   3. Exactly one frontend cookie
 
-   Never silently assume Gallery when the request is
-   ambiguous.
+   Ambiguous requests fail closed.
 ========================================================= */
 
 function resolveFrontendType(request) {
@@ -158,10 +169,7 @@ function resolveFrontendType(request) {
 
     if (url.searchParams.has("type")) {
         const explicitType = url.searchParams.get("type");
-
-        return isValidFrontendType(explicitType)
-            ? explicitType
-            : null;
+        return isValidArea(explicitType) ? explicitType : null;
     }
 
     const referer = request.headers.get("Referer");
@@ -170,11 +178,9 @@ function resolveFrontendType(request) {
         try {
             const refererUrl = new URL(referer);
 
-            // Only trust same-origin page context.
             if (refererUrl.origin === url.origin) {
                 const path = refererUrl.pathname.toLowerCase();
 
-                // Articles pages.
                 if (
                     path === "/articles" ||
                     path.startsWith("/articles/")
@@ -182,7 +188,14 @@ function resolveFrontendType(request) {
                     return "articles";
                 }
 
-                // Known Gallery pages.
+                if (
+                    path === "/dashboard" ||
+                    path.startsWith("/dashboard/") ||
+                    path === "/dashboard.html"
+                ) {
+                    return "dashboard";
+                }
+
                 if (
                     path === "/gallery" ||
                     path.startsWith("/gallery/") ||
@@ -193,46 +206,71 @@ function resolveFrontendType(request) {
                 }
             }
         } catch {
-            // Ignore an invalid Referer and try cookie detection.
+            // Ignore invalid Referer and use cookie fallback.
         }
     }
 
-    // Cookie-based fallback is safe only when exactly one
-    // frontend session cookie is present.
     const present = getPresentFrontendCookies(request);
 
-    if (present.length === 1) {
-        return present[0];
-    }
-
-    return null;
+    return present.length === 1 ? present[0] : null;
 }
+
+
+/* =========================================================
+   ACCOUNT HELPERS
+========================================================= */
+
+function getAccountPermissions(account, accountType) {
+    const permissions = Array.isArray(account?.permissions)
+        ? account.permissions
+        : DEFAULT_PERMISSIONS[accountType] || [];
+
+    return [...new Set(
+        permissions.filter(permission => VALID_AREAS.has(permission))
+    )];
+}
+
+function findAccountByUsername(authData, username) {
+    const matches = Object.entries(authData || {})
+        .filter(([accountType, account]) => {
+            return (
+                ["admin", "gallery", "articles"].includes(accountType) &&
+                account &&
+                typeof account.username === "string" &&
+                account.username === username
+            );
+        });
+
+    // Refuse ambiguous usernames rather than choosing an account
+    // unpredictably if storage has duplicate usernames.
+    return matches.length === 1
+        ? { accountType: matches[0][0], account: matches[0][1] }
+        : null;
+}
+
 
 /* =========================================================
    POST /auth/frontend/login
 
-   Body:
-   {
-       "type": "gallery",
-       "username": "gallery",
-       "password": "..."
-   }
-
-   The Articles account uses type: "articles".
+   The request `type` is the target area. The username determines
+   which stored account is authenticating.
 ========================================================= */
 
 export async function login(request, env) {
     try {
         const body = await readJson(request);
 
-        if (!body || typeof body !== "object") {
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
             return error("Invalid JSON body", 400);
         }
 
-        const { type, username, password } = body;
+        const { type: area, username, password } = body;
 
-        if (!isValidFrontendType(type)) {
-            return error("Invalid frontend account type", 400);
+        if (!isValidArea(area)) {
+            return error(
+                "Invalid frontend area. Use gallery, articles, or dashboard.",
+                400
+            );
         }
 
         if (
@@ -241,36 +279,42 @@ export async function login(request, env) {
             typeof password !== "string" ||
             !password
         ) {
-            return error(
-                "Username and password are required",
-                400
-            );
+            return error("Username and password are required", 400);
         }
 
-        if (!env.JWT_SECRET) {
-            console.error("JWT_SECRET is not configured");
+        if (username.length > 256 || password.length > 1024) {
+            return error("Invalid username or password", 400);
+        }
 
+        if (!env?.JWT_SECRET) {
+            console.error("JWT_SECRET is not configured");
             return error("Authentication is unavailable", 500);
         }
 
         const authData = await loadFrontendAuth(env);
-        const account = authData?.[type];
+        const match = findAccountByUsername(authData, username);
 
-        if (!account) {
-            return error("Frontend account not found", 401);
+        // Use a generic response for unknown accounts to avoid revealing
+        // whether a username exists.
+        if (!match) {
+            return error("Invalid username or password", 401);
         }
+
+        const { accountType, account } = match;
 
         if (account.enabled === false) {
             return error("This account is disabled", 403);
         }
 
-        if (account.username !== username) {
-            return error("Invalid username or password", 401);
+        const permissions = getAccountPermissions(account, accountType);
+
+        if (!permissions.includes(area)) {
+            return error("This account does not have access to this area", 403);
         }
 
         const valid = await verifyFrontendPassword(
             env,
-            type,
+            accountType,
             password
         );
 
@@ -283,8 +327,10 @@ export async function login(request, env) {
         const token = await signJwt(
             {
                 type: "frontend",
-                frontend: type,
+                frontend: area,
+                accountType,
                 username: account.username,
+                permissions,
                 version: tokenVersion
             },
             env.JWT_SECRET,
@@ -293,7 +339,11 @@ export async function login(request, env) {
             }
         );
 
-        const cookieName = FRONTEND_COOKIES[type];
+        const cookieName = FRONTEND_COOKIES[area];
+
+        if (!cookieName) {
+            return error("Session configuration is invalid", 500);
+        }
 
         const cookie = createCookie(
             cookieName,
@@ -306,8 +356,10 @@ export async function login(request, env) {
                 success: true,
                 authenticated: true,
                 user: {
-                    type,
-                    username: account.username
+                    type: accountType,
+                    username: account.username,
+                    frontend: area,
+                    permissions
                 },
                 message: "Login successful"
             },
@@ -323,7 +375,7 @@ export async function login(request, env) {
         );
 
         return error(
-            env.NODE_ENV === "production"
+            env?.NODE_ENV === "production"
                 ? "Server error"
                 : err?.message || "Server error",
             500
@@ -331,46 +383,46 @@ export async function login(request, env) {
     }
 }
 
+
 /* =========================================================
    GET /auth/frontend/check
 
-   Supports existing calls without ?type= when the type
-   can be resolved safely from the request context.
+   Existing Gallery/Articles calls remain supported.
+   Dashboard may use ?type=dashboard.
 ========================================================= */
 
 export async function check(request, env) {
     try {
-        const type = resolveFrontendType(request);
+        const area = resolveFrontendType(request);
 
-        if (!type) {
+        if (!area) {
             return error(
-                "Unable to determine frontend type. " +
-                "Provide ?type=gallery or ?type=articles.",
+                "Unable to determine frontend area. " +
+                "Provide ?type=gallery, ?type=articles, or ?type=dashboard.",
                 400
             );
         }
 
-        const auth = await authenticateFrontend(
-            request,
-            env,
-            type
-        );
+        const auth = await authenticateFrontend(request, env, area);
 
         if (!auth?.authenticated) {
-            return error(
-                auth?.message || "Not authenticated",
-                401
-            );
+            const status = auth?.message === "Permission denied" ? 403 : 401;
+            return error(auth?.message || "Not authenticated", status);
         }
 
-        if (auth.user?.frontend !== type) {
+        if (auth.user?.frontend !== area) {
             return error("Frontend session mismatch", 401);
         }
 
         return json({
             success: true,
             authenticated: true,
-            user: auth.user
+            user: {
+                type: auth.user.accountType || auth.user.frontend,
+                username: auth.user.username,
+                frontend: auth.user.frontend,
+                permissions: auth.permissions || auth.user.permissions || []
+            }
         });
     } catch (err) {
         console.error(
@@ -382,26 +434,26 @@ export async function check(request, env) {
     }
 }
 
+
 /* =========================================================
    POST /auth/frontend/logout
 
-   Clears only the resolved frontend cookie.
-   Does not clear gallery_token or article_session.
+   Clears only the requested area's cookie.
 ========================================================= */
 
 export async function logout(request, env) {
     try {
-        const type = resolveFrontendType(request);
+        const area = resolveFrontendType(request);
 
-        if (!type) {
+        if (!area) {
             return error(
                 "Unable to determine which frontend to log out. " +
-                "Provide ?type=gallery or ?type=articles.",
+                "Provide ?type=gallery, ?type=articles, or ?type=dashboard.",
                 400
             );
         }
 
-        const cookieName = FRONTEND_COOKIES[type];
+        const cookieName = FRONTEND_COOKIES[area];
 
         const cookie = clearCookie(
             cookieName,
@@ -412,7 +464,7 @@ export async function logout(request, env) {
             {
                 success: true,
                 message: "Logged out",
-                frontend: type
+                frontend: area
             },
             200,
             {
@@ -428,6 +480,7 @@ export async function logout(request, env) {
         return error("Logout failed", 500);
     }
 }
+
 
 /* =========================================================
    ROUTER
